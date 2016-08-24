@@ -12,7 +12,6 @@ struct bag {
     inserter insert;
     committer commit;
     table listeners; // who is this again?
-    table implications; // goes away with reflection
 };
 
 struct edb {
@@ -55,7 +54,7 @@ void destroy_bag(bag b);
     for(multiplicity __c = ((leaf)__cv)->m, __z = 0; !__z; __z++)
 
 long count_of(edb b, value e, value a, value v);
-edb create_edb(heap, uuid, vector inherits);
+edb create_edb(heap, vector inherits);
 
 #define edb_foreach_av(__b, __e, __a, __v, __c)\
     for(table __av = (table)table_find((__b)->eav, __e); __av; __av = 0)  \

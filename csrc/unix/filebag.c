@@ -210,7 +210,7 @@ void filebag_commit(filebag fb, edb s)
     }
 }
 
-bag filebag_init(buffer root_pathname, uuid root)
+bag filebag_init(buffer root_pathname)
 {
     if (!file_attributes) {
         file_attributes = create_value_table(init);
@@ -228,7 +228,6 @@ bag filebag_init(buffer root_pathname, uuid root)
     fb->root = allocate_file(fb, 0, generate_uuid());
     fb->root->name = intern_cstring(".");
     fb->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
-    fb->b.implications = allocate_table(h, key_from_pointer, compare_pointer);
     fb->b.commit = cont(h, filebag_commit, fb);
     return (bag)fb;
 }

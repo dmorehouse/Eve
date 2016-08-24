@@ -428,10 +428,10 @@ static void *json_top(json_parser p, character c)
 {
     switch(c) {
     case '{':
-        p->b = (bag)create_edb(p->h, 0, 0);
+        p->b = (bag)create_edb(p->h, 0);
         return start_object(p);
     case '[':
-        p->b = (bag)create_edb(p->h, 0, 0);
+        p->b = (bag)create_edb(p->h, 0);
         return start_array(p);
     default:
         if (whitespace(c)) return json_top;

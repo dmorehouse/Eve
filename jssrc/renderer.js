@@ -1202,7 +1202,7 @@ function handleDiff(state, diff) {
 }
 
 
-var socket = new WebSocket("ws://" + window.location.host +"/ws");
+var socket = new WebSocket("ws://" + window.location.host + window.location.href,  "eve-json")
   var frameRequested = false;
   var prerendering = false;
 socket.onmessage = function(msg) {

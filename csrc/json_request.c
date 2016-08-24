@@ -47,7 +47,7 @@ buffer format_error_json(heap h, char* message, bag data, uuid data_id)
     if(data != 0) {
       vector_set(includes, 0, data);
     }
-    bag response = (bag)create_edb(h, id, includes);
+    bag response = (bag)create_edb(h, includes);
     uuid root = generate_uuid();
     apply(response->insert, root, sym(type), sym(error), 1, 0);
     apply(response->insert, root, sym(stage), sym(executor), 1, 0);
@@ -70,7 +70,7 @@ static void handle_error(json_session session, char * message, bag data, uuid da
 // always call this guy independent of commit so that we get an update,
 // even on empty, after the first evaluation. warning, destroys
 // his heap
-static void send_guy(heap h, buffer_handler output, values_diff diff)
+static void send_diff(heap h, buffer_handler output, values_diff diff)
 {
     string out = allocate_string(h);
     bprintf(out, "{\"type\":\"result\", \"insert\":[");
@@ -190,12 +190,6 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     }
 
 
-    table_foreach(session->persisted, k, scopeBag) {
-        table_foreach(((bag)scopeBag)->implications, impl, _) {
-            send_node_times(h, session->write, ((compiled)impl)->head, counters);
-        }
-    }
-
     values_diff diff = diff_value_vector_tables(p, session->current_delta, results);
     // destructs h
 
@@ -209,12 +203,13 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     }
 
 
-    send_guy(h, session->write, diff);
+    send_diff(h, session->write, diff);
 
     destroy(session->current_delta->h);
     session->current_delta = results;
 }
 
+// this should be a reflection
 void send_parse(json_session session, buffer query)
 {
     heap h = allocate_rolling(pages, sstring("parse response"));
@@ -246,38 +241,18 @@ void handle_json_query(json_session session, bag in, uuid root)
     if (t == sym(query)) {
         inject_event(session->ev, x, session->tracing);
     }
-    if (t == sym(swap)) {
-        close_evaluation(session->ev);
-        // xxx - reflection
-        session->root->implications =  allocate_table(((edb)session->root)->h, key_from_pointer, compare_pointer);
 
-        vector nodes = compile_eve(init, x, session->tracing, &desc);
-        root_graph = desc;
-        session->graph = desc;
-        heap graph_heap = allocate_rolling(pages, sstring("initial graphs"));
-        vector_foreach(nodes, node) {
-            // xxx - reflection
-            table_set(session->root->implications, node, (void *)1);
-            send_cnode_graph(graph_heap, session->write, ((compiled)node)->head);
-        }
-        // send full parse destroys the heap
-        if(session->graph) {
-            send_full_parse(graph_heap, session->write, session->graph);
-        } else {
-            destroy(graph_heap);
-        }
-        session->ev = build_evaluation(session->scopes, session->persisted, cont(session->h, send_response, session), cont(session->h, handle_error, session));
-        run_solver(session->ev);
-    }
     if (t == sym(parse)) {
         send_parse(session, alloca_wrap_buffer(q->body, q->length));
     }
+
     if (t == sym(save)) {
         write_file(exec_path, alloca_wrap_buffer(q->body, q->length));
     }
 }
 
 
+// build_evaluation(session->scopes, session->persisted, cont(session->h, send_response, session), cont(session->h, handle_error, session));
 CONTINUATION_2_4(new_json_session,
                  bag, boolean,
                  buffer_handler, bag, uuid, register_read)
@@ -291,36 +266,18 @@ void new_json_session(bag root, boolean tracing,
     session->h = h;
     session->root = root;
     session->tracing = tracing;
-    session->session = (bag)create_edb(h, su, 0);
+    session->session = (bag)create_edb(h, 0);
     session->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("trash")));
     session->browser_uuid = generate_uuid();
     session->graph = root_graph;
     session->eh = allocate_rolling(pages, sstring("eval"));
-    session->ev = build_evaluation(session->scopes, session->persisted, cont(session->h, send_response, session), cont(session->h, handle_error, session));
+
+
     session->write = websocket_send_upgrade(session->eh, b, u,
                                       write,
                                       parse_json(session->eh, cont(h, handle_json_query, session)),
                                       reg);
 
-    // send the graphs
-    heap graph_heap = allocate_rolling(pages, sstring("initial graphs"));
-    table_foreach(session->persisted, k, scopeBag) {
-        table_foreach(((bag)scopeBag)->implications, impl, _) {
-            send_cnode_graph(graph_heap, session->write, ((compiled)impl)->head);
-        }
-    }
-    // send full parse destroys the heap
-    if(session->graph) {
-        send_full_parse(graph_heap, session->write, session->graph);
-    } else {
-        destroy(graph_heap);
-    }
-    inject_event(session->ev, aprintf(session->h,"init!\n```\nbind\n      [#session-connect]\n```"), session->tracing);
-}
 
-void init_json_service(http_server h, bag root, boolean tracing, buffer graph, char *exec_file_path)
-{
-    root_graph = graph;
-    exec_path = exec_file_path;
-    http_register_service(h, cont(init, new_json_session, root, tracing), sstring("/ws"));
+    inject_event(session->ev, aprintf(session->h,"init!\n```\nbind\n      [#session-connect]\n```"), session->tracing);
 }

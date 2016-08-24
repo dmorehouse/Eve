@@ -94,7 +94,7 @@ static void bag_update(table idmap, bag root, bag deltas)
         r->h = h;
         // deltas
         //   r->b = table_find(ev->persisted, table_find(ev->scopes, sym(remote)));
-        bag shadow = (bag)create_edb(h, 0 /*root->u*/, build_vector(h, root));
+        bag shadow = (bag)create_edb(h, build_vector(h, root));
         apply(shadow->insert, e, sym(url), sym(/ws), 1, 0);
         apply(shadow->insert, e, sym(method), sym(GET), 1, 0);
         r->w = websocket_client(h, shadow, e,
@@ -112,5 +112,5 @@ bag init_request_service()
     // ok, we're going to do that...uhh,
     // temporary - going to be implemented just as a bag handler
     // table_set(b->delta_listeners, cont(init, bag_update, idmap, b), (void *)1);
-    return (bag)create_edb(init, generate_uuid(), 0);
+    return (bag)create_edb(init, 0);
 }

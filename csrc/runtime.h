@@ -138,13 +138,14 @@ void close_evaluation(evaluation);
 extern char *pathroot;
 
 vector compile_eve(heap h, buffer b, boolean tracing, buffer *desc);
-evaluation build_evaluation(table scopes, table persisted, evaluation_result e, error_handler error);
+evaluation build_evaluation(heap h, table scopes, table persisted,
+                            evaluation_result e, error_handler error, vector implications);
 void run_solver(evaluation s);
 void inject_event(evaluation, buffer b, boolean);
 void block_close(block);
 bag init_request_service();
 
-bag filebag_init(buffer, uuid);
+bag filebag_init(buffer);
 extern thunk ignore;
 
 static void get_stack_trace(string *out)
@@ -161,3 +162,24 @@ static void get_stack_trace(string *out)
 
 void merge_scan(evaluation ev, vector scopes, int sig, listener result, value e, value a, value v);
 void multibag_insert(multibag *mb, heap h, uuid u, value e, value a, value v, multiplicity m, uuid block_id);
+
+
+static void build_bag(table scope, table bags, char *name, bag b)
+{
+    uuid x = generate_uuid();
+    table_set(bags, x, b);
+    table_set(scope, intern_cstring(name),x);
+}
+
+static evaluation build_process(buffer source,
+                                boolean tracing,
+                                table scopes,
+                                table inputs,
+                                evaluation_result r,
+                                error_handler e)
+{
+    buffer desc;
+    heap h = allocate_rolling(pages, sstring("eval"));
+    vector n = compile_eve(h, source, tracing, &desc);
+    return build_evaluation(h, scopes, inputs, r, e, n);
+}

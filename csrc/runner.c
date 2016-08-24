@@ -38,7 +38,7 @@ void multibag_insert(multibag *mb, heap h, uuid u, value e, value a, value v, mu
 
     if (!*mb) (*mb) = create_value_table(h);
     if (!(b = table_find((*mb), u)))
-        table_set(*mb, u, b = (bag)create_edb(h, u, 0));
+        table_set(*mb, u, b = (bag)create_edb(h, 0));
 
     apply(b->insert, e, a, v, m, block_id);
 }
@@ -56,7 +56,7 @@ static estring bagname(evaluation e, uuid u)
 static bag diff_sets(heap h, multibag neue_bags, multibag old_bags)
 {
     uuid diff_id = generate_uuid();
-    bag diff = (bag)create_edb(h, diff_id, 0);
+    bag diff = (bag)create_edb(h, 0);
     bag old;
 
     table_foreach(neue_bags, u, neue) {
@@ -246,7 +246,7 @@ const int MAX_T_ITERATIONS = 50;
 
 static void fixedpoint_error(evaluation ev, vector diffs, char * message) {
     uuid error_data_id = generate_uuid();
-    bag edata = (bag)create_edb(ev->working, error_data_id, 0);
+    bag edata = (bag)create_edb(ev->working, 0);
     uuid error_diffs_id = generate_uuid();
     apply(edata->insert, error_diffs_id, sym(tag), sym(array), 1, 0);
 
@@ -316,7 +316,7 @@ static boolean fixedpoint(evaluation ev)
         } while(!compare_multibags(ev->f_solution, ev->last_f_solution));
 
         if(vector_length(counts) > (MAX_T_ITERATIONS - 1)) {
-            bag diff = (bag)create_edb(ev->working, generate_uuid(), 0);
+            bag diff = (bag)create_edb(ev->working, 0);
             multibag_foreach(ev->t_solution, u, b) {
                 edb_foreach((edb)b, e, a, v, c, block_id) {
                     apply(diff->insert, e, a, v, c, block_id);
@@ -344,7 +344,7 @@ static boolean fixedpoint(evaluation ev)
     multibag_foreach(ev->t_solution, u, b) {
         bag bd;
         if (!(bd = table_find(ev->t_input, u)))
-            table_set(ev->t_input, u, bd = (bag)create_edb(ev->h, u, 0));
+            table_set(ev->t_input, u, bd = (bag)create_edb(ev->h, 0));
         apply(bd->commit, b);
     }
 
@@ -412,9 +412,13 @@ void close_evaluation(evaluation ev)
     destroy(ev->h);
 }
 
-evaluation build_evaluation(table scopes, multibag t_input, evaluation_result r, error_handler error)
+evaluation build_evaluation(heap h,
+                            table scopes,
+                            multibag t_input,
+                            evaluation_result r,
+                            error_handler error,
+                            vector implications)
 {
-    heap h = allocate_rolling(pages, sstring("eval"));
     evaluation ev = allocate(h, sizeof(struct evaluation));
     ev->h = h;
     ev->error = error;
@@ -438,13 +442,13 @@ evaluation build_evaluation(table scopes, multibag t_input, evaluation_result r,
 
     table_foreach(ev->t_input, uuid, z) {
         bag b = z;
-
         table_set(b->listeners, ev->run, (void *)1);
-        // xxx - reflecton
-        table_foreach(b->implications, n, v){
-            vector_insert(ev->blocks, build(ev, n));
-        }
     }
+
+    // xxx - reflecton
+    vector_foreach(implications, i)
+        // xxx - shouldn't build take the termination?
+        vector_insert(ev->blocks, build(ev, i));
 
     return ev;
 }

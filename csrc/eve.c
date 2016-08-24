@@ -11,11 +11,15 @@ static buffer server_eve = 0;
 // defer these until after everything else has been set up
 static vector tests;
 
-#define register(__h, __url, __content, __name)\
+//filesystem like tree namespace
+#define register(__bag, __url, __content, __name)\
  {\
     extern unsigned char __name##_start, __name##_end;\
     unsigned char *s = &__name##_start, *e = &__name##_end;\
-    register_static_content(__h, __url, __content, wrap_buffer(init, s, e-s), dynamicReload?(char *)e:0); \
+    uuid n = generate_uuid();\
+    apply(__bag->insert, e, sym(url), sym(__url), 1, 0);           \
+    apply(__bag->insert, e, sym(body), intern_string(s, e-s), 1, 0);       \
+    apply(__bag->insert, e, sym(content-type), sym(__content_type), 1, 0); \
  }
 
 int atoi( const char *str );
@@ -66,38 +70,30 @@ static void test_result(heap h, multibag t, multibag f, table counts)
     } else prf("result: empty\n");
 }
 
+// with the input/provides we can special case less of this
+static void run_eve_http_server(bag root, buffer b, boolean tracing)
+{
+    evaluation ev;
+    http_server h = create_http_server(create_station(0, port), ev);
+}
+
 static void run_test(bag root, buffer b, boolean tracing)
 {
     heap h = allocate_rolling(pages, sstring("command line"));
-    bag troot =  (bag)create_edb(h, generate_uuid(), 0);
-    bag remote = (bag)create_edb(h, generate_uuid(), 0);
-    // todo - reduce the amount of setup required here
-    bag event = (bag)create_edb(h, generate_uuid(), 0);
-    bag session = (bag)create_edb(h, generate_uuid(), 0);
-    bag fb = filebag_init(sstring(pathroot), generate_uuid());
-
     table scopes = create_value_table(h);
-    table_set(scopes, intern_cstring("all"), troot->u);
-    table_set(scopes, intern_cstring("session"), session->u);
-    table_set(scopes, intern_cstring("event"), event->u);
-    table_set(scopes, intern_cstring("remote"), remote->u);
-    table_set(scopes, intern_cstring("file"), fb->u);
-
     table persisted = create_value_table(h);
-    table_set(persisted, troot->u, troot);
-    table_set(persisted, session->u, session);
-    table_set(persisted, fb->u, fb);
-    table_set(persisted, remote->u, remote);
+    build_bag(scopes, persisted, "all", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "session", (bag)create_edb(h, 0));
+    // maybe?
+    build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
 
-    init_request_service(troot);
-    buffer desc;
-    vector n = compile_eve(h, b, tracing, &desc);
-    vector_foreach(n, i)
-        table_set(session->implications, i, (void *)1);
+    evaluation ev = build_process(b, tracing, scopes, persisted,
+                                  cont(h, test_result, h),
+                                  cont(h, handle_error_terminal));
 
-    evaluation ev = build_evaluation(scopes, persisted, cont(h, test_result, h), cont(h, handle_error_terminal));
     inject_event(ev, aprintf(h,"init!\n```\nbind\n      [#test-start]\n```"), tracing);
-    //    destroy(h); everything asynch is running here!
 }
 
 
@@ -153,16 +149,6 @@ static void do_json(interpreter c, char *x, bag b)
     apply(r, f, cont(init, end_read));
 }
 
-static void do_exec(interpreter c, char *x, bag b)
-{
-    buffer desc;
-    buffer f = read_file_or_exit(init, x);
-    exec_path = x;
-    vector v = compile_eve(init, f, enable_tracing, &loadedParse);
-    vector_foreach(v, i)
-        table_set(b->implications, i, (void *)1);
-}
-
 static void do_server_eve(interpreter c, char *x, bag b)
 {
     server_eve = read_file_or_exit(init, x);
@@ -178,7 +164,6 @@ static struct command command_body[] = {
     {"r", "run", "execute eve", true, do_run_test},
     //    {"s", "serve", "serve urls from the given root path", true, 0},
     {"S", "seve", "use the subsequent eve file to serve http requests", true, do_server_eve},
-    {"e", "exec", "read eve file and serve", true, do_exec},
     {"P", "port", "serve http on passed port", true, do_port},
     {"h", "help", "print help", false, print_help},
     {"j", "json", "source json object from file", true, do_json},
@@ -198,10 +183,10 @@ static void print_help(interpreter c, char *x, bag b)
 int main(int argc, char **argv)
 {
     init_runtime();
-    bag root = (bag)create_edb(init, generate_uuid(), 0);
+    bag root = (bag)create_edb(init, 0);
     interpreter interp = build_lua();
     commands = command_body;
-    boolean dynamicReload = true;
+
     tests = allocate_vector(init, 5);
 
     //    init_request_service(root);
@@ -222,22 +207,19 @@ int main(int argc, char **argv)
             c->f(interp, argv[i+1], root);
             if (c->argument) i++;
         } else {
-            do_exec(interp, argv[i], root);
-            // prf("\nUnknown flag %s, aborting\n", argv[i]);
-            // exit(-1);
+            prf("\nUnknown flag %s, aborting\n", argv[i]);
+            exit(-1);
         }
     }
 
-    http_server h = create_http_server(create_station(0, port), server_eve);
-    register(h, "/", "text/html", index);
-    register(h, "/jssrc/renderer.js", "application/javascript", renderer);
-    register(h, "/jssrc/microReact.js", "application/javascript", microReact);
-    register(h, "/jssrc/codemirror.js", "application/javascript", codemirror);
-    register(h, "/jssrc/codemirror.css", "text/css", codemirrorCss);
-    register(h, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
-
-    // TODO: figure out a better way to manage multiple graphs
-    init_json_service(h, root, enable_tracing, loadedParse, exec_path);
+    bag content = (bag)create_edb(init, 0);
+    // linker sets?
+    register(content, "/", "text/html", index);
+    register(content, "/jssrc/renderer.js", "application/javascript", renderer);
+    register(content, "/jssrc/microReact.js", "application/javascript", microReact);
+    register(content, "/jssrc/codemirror.js", "application/javascript", codemirror);
+    register(content, "/jssrc/codemirror.css", "text/css", codemirrorCss);
+    register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
 
     prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
 

@@ -188,7 +188,7 @@ static void edb_insert(edb b, value e, value a, value v, multiplicity m, uuid bl
 static CONTINUATION_1_1(edb_commit, edb, edb);
 static void edb_commit(edb b, edb source)
 {
-    edb_foreach(source, e, a, v, m, block_id) 
+    edb_foreach(source, e, a, v, m, block_id)
         edb_insert(b, e, a, v, m, block_id);
 }
 
@@ -202,7 +202,7 @@ int buffer_unicode_length(buffer buf)
 }
 
 
-edb create_edb(heap h, uuid u, vector includes)
+edb create_edb(heap h, vector includes)
 {
     edb b = allocate(h, sizeof(struct edb));
     b->b.insert = cont(h, edb_insert, b);
@@ -210,7 +210,6 @@ edb create_edb(heap h, uuid u, vector includes)
     b->b.scan_sync = cont(h, edb_scan_sync, b);
     //    b->b.u = u;
     b->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
-    b->b.implications = allocate_table(h, key_from_pointer, compare_pointer);
     b->b.commit = cont(h, edb_commit, b);
     b->h = h;
     b->count = 0;

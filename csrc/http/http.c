@@ -112,8 +112,7 @@ reader new_parser(heap h, http_handler result, value a, value b, value c)
     header_parser p = allocate(h, sizeof(struct header_parser));
     p->h = h;
     p->up = result;
-    p->b = (bag)create_edb(h, 0, 0); // uuid?
-    p->u = generate_uuid();
+    p->b = (bag)create_edb(h, 0);
     p->s = 0;
     p->headers[0] = a;
     p->headers[1] = b;
