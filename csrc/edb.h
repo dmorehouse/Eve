@@ -6,7 +6,7 @@ typedef closure(inserter, value, value, value, multiplicity, uuid);
 typedef closure(committer, edb);
 
 struct bag {
-    uuid u;
+    //  uuid u; ?
     scanner scan;
     scanner scan_sync;
     inserter insert;
@@ -31,12 +31,15 @@ typedef struct leaf {
     multiplicity m;
 } *leaf;
 
+#define e_sig 0x04
+#define a_sig 0x02
+#define v_sig 0x01
 #define s_eav 0x0
-#define s_eAv 0x2
-#define s_eAV 0x3
-#define s_Eav 0x4
-#define s_EAv 0x6
-#define s_EAV 0x7
+#define s_eAv (a_sig)
+#define s_eAV (a_sig | v_sig)
+#define s_Eav (e_sig)
+#define s_EAv (e_sig | a_sig)
+#define s_EAV (e_sig | a_sig | v_sig)
 
 value lookupv(edb b, uuid e, estring a);
 

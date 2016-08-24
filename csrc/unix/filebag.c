@@ -137,14 +137,13 @@ static void filebag_e_scan(filebag fb, file f, listener out, value e, value a)
 CONTINUATION_1_5(filebag_scan, filebag, int, listener, value, value, value);
 void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
 {
-    if (sig & 0x04) /*E*/ {
+    if (sig & e_sig) {
         file f = table_find(fb->idmap, e);
         if (f) {
             struct stat st;
             int res = stat(path_of_file(f), &st);
-            if (sig & 0x02) /*A*/ {
-                // xxx - we should do the filter thing
-                if (sig & 1) {
+            if (sig & a_sig) {
+                if (sig & v_sig) {
                     if (((a == sym(tag)) && (v == sym(root)) && (e == fb->root->u)) ||
                         filebag_eav_check(fb, f, &st, out, e, a, v))
                         apply(out, e, a, v, 1, 0);
@@ -160,10 +159,10 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
             }
         }
     } else {
-        if ((sig == 3) && (a == sym(tag)) && (v == sym(root))) {
+        if ((sig == s_eAV) && (a == sym(tag)) && (v == sym(root))) {
             apply(out, fb->root->u, a, v, 1, 0);
         }
-        if ((sig == 2) && (a ==sym(child))) {
+        if ((sig == s_eAv) && (a ==sym(child))) {
             // ech -- recurse
             fill_children(fb, fb->root);
             table_foreach(fb->root->children, _, u) {

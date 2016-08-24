@@ -1,3 +1,5 @@
+## to download and install a dedicated copy of luajit:
+## LUAJIT_INSTALL = ./lua 
 LUAJIT_INSTALL = /usr/local
 LUAJIT = $(LUAJIT_INSTALL)/bin/luajit-2.1.0-beta2
 LIBLUAJIT = $(LUAJIT_INSTALL)/lib/libluajit-5.1.a
