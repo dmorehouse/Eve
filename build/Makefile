@@ -31,6 +31,11 @@ VPATH += ../csrc/dns
 VPATH += ../src
 VPATH += ../csrc
 
+CFLAGS = -g
+
+opt: eve
+opt: CFLAGS = -O2
+
 LUAPOWER = bundle.o
 UTF = lutf8lib.o
 COMPILER = compiler.o error.o fs.o parser.o util.o set.o color.o build.o implicationResolver.o db.o
@@ -82,7 +87,7 @@ path.c: Makefile
 	echo 'char *pathroot = "$(BUILD)";' > path.c
 
 %.o: %.c continuation_templates.h $(UNIX_H) $(CORE_H) $(RUNTIME_H) $(HTTP_H)
-	cc -std=gnu99 -I../csrc/unix -I../csrc/core -I../csrc -I. $(INCLUDES) -I$(LUAJIT_INCLUDES) -g -c $<
+	cc -std=gnu99 -I../csrc/unix -I../csrc/core -I../csrc -I. $(INCLUDES) -I$(LUAJIT_INCLUDES) $(CFLAGS) -c $<
 
 %.o: %.lua $(LUAJIT)
 	$(LUAJIT) -b -g $< $@

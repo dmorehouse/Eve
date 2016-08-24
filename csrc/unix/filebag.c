@@ -223,7 +223,7 @@ bag filebag_init(buffer root_pathname, uuid root)
     fb->h = h;
     fb->b.insert = cont(h, filebag_insert, fb);
     fb->b.scan = cont(h, filebag_scan, fb);
-    fb->b.u = generate_uuid();
+    //    fb->b.u = generate_uuid();
     fb->idmap = create_value_table(h);
     fb->root = allocate_file(fb, 0, generate_uuid());
     fb->root->name = intern_cstring(".");

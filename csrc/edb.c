@@ -208,7 +208,7 @@ edb create_edb(heap h, uuid u, vector includes)
     b->b.insert = cont(h, edb_insert, b);
     b->b.scan = cont(h, edb_scan, b);
     b->b.scan_sync = cont(h, edb_scan_sync, b);
-    b->b.u = u;
+    //    b->b.u = u;
     b->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
     b->b.implications = allocate_table(h, key_from_pointer, compare_pointer);
     b->b.commit = cont(h, edb_commit, b);

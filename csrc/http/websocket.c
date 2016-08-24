@@ -177,7 +177,7 @@ static void client_connected(websocket w, bag request, uuid rid,
                              buffer_handler wr, register_read r)
 {
     
-    bag shadow = (bag)create_edb(w->h, request->u, build_vector(w->h, request));
+    bag shadow = (bag)create_edb(w->h, /*request->u*/ 0, build_vector(w->h, request));
 
     value header = lookupv((edb)request, rid, sym(headers));
     // i guess we could vary this, but since it doesn't actually provide any security...
