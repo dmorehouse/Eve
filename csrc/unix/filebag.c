@@ -211,7 +211,6 @@ void filebag_commit(filebag fb, edb s)
     }
 }
 
-// should return an abstract bag
 bag filebag_init(buffer root_pathname, uuid root)
 {
     if (!file_attributes) {

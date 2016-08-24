@@ -295,22 +295,6 @@ void new_json_session(bag root, boolean tracing,
     session->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("trash")));
     session->browser_uuid = generate_uuid();
     session->graph = root_graph;
-    session->persisted = create_value_table(h);
-
-    table_set(session->persisted, session->root->u, session->root);
-    table_set(session->persisted, session->session->u, session->session);
-
-    session->scopes = create_value_table(session->h);
-    table_set(session->scopes, intern_cstring("session"), session->session->u);
-    table_set(session->scopes, intern_cstring("all"), session->root->u);
-    table_set(session->scopes, intern_cstring("browser"), session->browser_uuid);
-
-    // xxx - parameterize file root path
-    // we really shouldn't be allowing everyone to mess with the filesystem
-    bag fb = filebag_init(sstring(pathroot), generate_uuid());
-    table_set(session->scopes, intern_cstring("file"), fb->u);
-    table_set(session->persisted, fb->u, fb);
-
     session->eh = allocate_rolling(pages, sstring("eval"));
     session->ev = build_evaluation(session->scopes, session->persisted, cont(session->h, send_response, session), cont(session->h, handle_error, session));
     session->write = websocket_send_upgrade(session->eh, b, u,
