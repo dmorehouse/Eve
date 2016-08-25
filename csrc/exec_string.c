@@ -72,9 +72,30 @@ static void do_split(perf p, execf n,
 }
 
 
+static execf build_split_bound_index(block bk, node n)
+{
+    return cont(bk->h, do_split,
+                register_perf(bk->ev, n),
+                resolve_cfg(bk, n, 0),
+                table_find(n->arguments, sym(token)),
+                table_find(n->arguments, sym(text)),
+                table_find(n->arguments, sym(index)),
+                table_find(n->arguments, sym(by)));
+}
+
+static execf build_split_filter(block bk, node n)
+{
+    return cont(bk->h, do_split,
+                register_perf(bk->ev, n),
+                resolve_cfg(bk, n, 0),
+                table_find(n->arguments, sym(token)),
+                table_find(n->arguments, sym(text)),
+                table_find(n->arguments, sym(index)),
+                table_find(n->arguments, sym(by)));
+}
+
 static execf build_split(block bk, node n)
 {
-    // need an index here
     return cont(bk->h, do_split,
                 register_perf(bk->ev, n),
                 resolve_cfg(bk, n, 0),
@@ -119,5 +140,7 @@ void register_string_builders(table builders)
 {
     table_set(builders, intern_cstring("concat"), build_concat);
     table_set(builders, intern_cstring("split"), build_split);
+    table_set(builders, intern_cstring("split-filter"), build_split_filter);
+    table_set(builders, intern_cstring("split-bound-index"), build_split_bound_index);
     table_set(builders, intern_cstring("length"), build_length);
 }

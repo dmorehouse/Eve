@@ -5,6 +5,7 @@
 
 struct http_server {
     heap h;
+    evaluation ev;
     // set of sessions?
 };
 
@@ -67,7 +68,9 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
         return;
     }
 
-    inject_event(s->ev,
+    prf("request: %b %v\n", edb_dump(init, (edb)b), i);
+
+    inject_event(s->parent->ev,
                  aprintf(s->h,"init!\n```\nbind\n[#http-request request:%v]\n```",
                          i),
                  false);
@@ -97,6 +100,7 @@ http_server create_http_server(station p, evaluation ev)
     heap h = allocate_rolling(pages, sstring("server"));
     http_server s = allocate(h, sizeof(struct http_server));
     s->h = h;
+    s->ev = ev;
 
     tcp_create_server(h,
                       p,

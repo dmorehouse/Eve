@@ -7,7 +7,6 @@ static boolean enable_tracing = false;
 static buffer loadedParse;
 static char *exec_path;
 static int port = 8080;
-static buffer server_eve = 0;
 // defer these until after everything else has been set up
 static vector tests;
 
@@ -180,11 +179,6 @@ static void do_json(char *x)
     apply(r, f, cont(init, end_read));
 }
 
-static void do_server_eve(char *x)
-{
-    server_eve = read_file_or_exit(init, x);
-}
-
 static command commands;
 
 static void print_help(char *x);
@@ -194,7 +188,7 @@ static struct command command_body[] = {
     {"a", "analyze", "parse order print structure", true, do_analyze},
     {"r", "run", "execute eve", true, do_run_test},
     //    {"s", "serve", "serve urls from the given root path", true, 0},
-    {"S", "seve", "use the subsequent eve file to serve http requests", true, do_server_eve},
+    {"s", "serve", "use the subsequent eve file to serve http requests", true, run_eve_http_server},
     {"P", "port", "serve http on passed port", true, do_port},
     {"h", "help", "print help", false, print_help},
     {"j", "json", "source json object from file", true, do_json},
