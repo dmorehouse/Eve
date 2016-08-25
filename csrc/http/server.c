@@ -8,7 +8,6 @@ struct http_server {
     evaluation ev;
     // set of sessions?
 };
-
 typedef struct session {
     bag b;
     heap h;
@@ -70,10 +69,14 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
 
     prf("request: %b %v\n", edb_dump(init, (edb)b), i);
 
+    // just throw it in anonymously??
+    table_set(s->parent->ev->t_input, generate_uuid(), b);
+              
     inject_event(s->parent->ev,
-                 aprintf(s->h,"init!\n```\nbind\n[#http-request request:%v]\n```",
+                 aprintf(s->h,
+                         "init!\n```\nbind\n[#http-request request:%v]\n```",
                          i),
-                 false);
+                 true);
 
     apply(reg, request_header_parser(s->h, cont(s->h, dispatch_request, s)));
 }

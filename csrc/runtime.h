@@ -181,5 +181,6 @@ static evaluation build_process(buffer source,
     buffer desc;
     heap h = allocate_rolling(pages, sstring("eval"));
     vector n = compile_eve(h, source, tracing, &desc);
+    prf("build process with %d blocks\n", vector_length(n));
     return build_evaluation(h, scopes, inputs, r, e, n);
 }

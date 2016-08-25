@@ -118,7 +118,7 @@ static void fill_children(filebag fb, file f)
         file child;
         estring cname = intern_cstring(d->d_name);
 
-        if (!(child = table_find(f->children, cname)))
+        if ((!f->children) || !(child = table_find(f->children, cname)))
             name_file(fb->h, allocate_file(fb, f, generate_uuid()), cname);
     }
 }

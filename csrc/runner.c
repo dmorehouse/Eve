@@ -36,6 +36,7 @@ void multibag_insert(multibag *mb, heap h, uuid u, value e, value a, value v, mu
 {
     bag b;
 
+    prf("mbi: %v %v %v\n", e, a, v);
     if (!*mb) (*mb) = create_value_table(h);
     if (!(b = table_find((*mb), u)))
         table_set(*mb, u, b = (bag)create_edb(h, 0));
@@ -217,6 +218,7 @@ static boolean merge_solution_into_t(multibag *m, heap h, uuid u, bag s)
 
 static void run_block(evaluation ev, block bk)
 {
+    prf("running %v\n", bk->name);
     heap bh = allocate_rolling(pages, sstring("block run"));
     bk->ev->block_t_solution = 0;
     bk->ev->block_f_solution = 0;
@@ -300,11 +302,16 @@ static boolean fixedpoint(evaluation ev)
             ev->last_f_solution = ev->f_solution;
             ev->f_solution = 0;
 
+            prf("fp: %d %d\n", vector_length(ev->event_blocks), vector_length(ev->blocks));
+
             if (ev->event_blocks)
                 vector_foreach(ev->event_blocks, b)
                     run_block(ev, b);
-            vector_foreach(ev->blocks, b)
+            
+            vector_foreach(ev->blocks, b) {
+                prf("wtf: %v\n", ((block)b)->name);
                 run_block(ev, b);
+            }
 
             if(iterations > (MAX_F_ITERATIONS - 1)) { // super naive 2-cycle diff capturing
                 vector_insert(f_diffs, diff_sets(ev->working, ev->last_f_solution, ev->f_solution));
@@ -391,6 +398,7 @@ void inject_event(evaluation ev, buffer b, boolean tracing)
             ev->event_blocks = allocate_vector(ev->working, vector_length(c));
         vector_insert(ev->event_blocks, build(ev, i));
     }
+
     fixedpoint(ev);
 }
 
@@ -446,9 +454,11 @@ evaluation build_evaluation(heap h,
     }
 
     // xxx - reflecton
-    vector_foreach(implications, i)
+    vector_foreach(implications, i) {
         // xxx - shouldn't build take the termination?
         vector_insert(ev->blocks, build(ev, i));
+        prf ("build block: %v\n", ((compiled)i)->name);
+    }
 
     return ev;
 }
