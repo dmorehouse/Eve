@@ -71,10 +71,37 @@ static void test_result(heap h, multibag t, multibag f, table counts)
 }
 
 // with the input/provides we can special case less of this
-static void run_eve_http_server(bag root, buffer b, boolean tracing)
+static void run_eve_http_server(char *x)
 {
-    evaluation ev;
-    http_server h = create_http_server(create_station(0, port), ev);
+    buffer b = read_file_or_exit(init, x);
+    heap h = allocate_rolling(pages, sstring("command line"));
+    table scopes = create_value_table(h);
+    table persisted = create_value_table(h);
+    build_bag(scopes, persisted, "all", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "session", (bag)create_edb(h, 0));
+    // maybe?
+    build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
+
+
+    bag content = (bag)create_edb(init, 0);
+    // linker sets?
+    register(content, "/", "text/html", index);
+    register(content, "/jssrc/renderer.js", "application/javascript", renderer);
+    register(content, "/jssrc/microReact.js", "application/javascript", microReact);
+    register(content, "/jssrc/codemirror.js", "application/javascript", codemirror);
+    register(content, "/jssrc/codemirror.css", "text/css", codemirrorCss);
+    register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
+    build_bag(scopes, persisted, "content", content);
+
+
+    evaluation ev = build_process(b, enable_tracing, scopes, persisted,
+                                  ignore, cont(h, handle_error_terminal));
+
+    create_http_server(create_station(0, port), ev);
+
+    prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
 }
 
 static void run_test(bag root, buffer b, boolean tracing)
@@ -101,30 +128,34 @@ static void run_test(bag root, buffer b, boolean tracing)
 typedef struct command {
     char *single, *extended, *help;
     boolean argument;
-    void (*f)(interpreter, char *, bag);
+    void (*f)(char *);
 } *command;
 
-static void do_port(interpreter c, char *x, bag b)
+static void do_port(char *x)
 {
     port = atoi(x);
 }
 
-static void do_tracing(interpreter c, char *x, bag b)
+static void do_tracing(char *x)
 {
     enable_tracing = true;
 }
 
-static void do_parse(interpreter c, char *x, bag b)
+static void do_parse(char *x)
 {
+    interpreter c = get_lua();
     lua_run_module_func(c, read_file_or_exit(init, x), "parser", "printParse");
+    free_lua(c);
 }
 
-static void do_analyze(interpreter c, char *x, bag b)
+static void do_analyze(char *x)
 {
+    interpreter c = get_lua();
     lua_run_module_func(c, read_file_or_exit(init, x), "compiler", "analyzeQuiet");
+    free_lua(c);
 }
 
-static void do_run_test(interpreter c, char *x, bag b)
+static void do_run_test(char *x)
 {
     vector_insert(tests, x);
 }
@@ -142,21 +173,21 @@ static void dumpo(bag b, uuid u)
 }
 
 // should actually merge into bag
-static void do_json(interpreter c, char *x, bag b)
+static void do_json(char *x)
 {
     buffer f = read_file_or_exit(init, x);
     reader r = parse_json(init, cont(init, dumpo));
     apply(r, f, cont(init, end_read));
 }
 
-static void do_server_eve(interpreter c, char *x, bag b)
+static void do_server_eve(char *x)
 {
     server_eve = read_file_or_exit(init, x);
 }
 
 static command commands;
 
-static void print_help(interpreter c, char *x, bag b);
+static void print_help(char *x);
 
 static struct command command_body[] = {
     {"p", "parse", "parse and print structure", true, do_parse},
@@ -171,7 +202,7 @@ static struct command command_body[] = {
     //    {"R", "resolve", "implication resolver", false, 0},
 };
 
-static void print_help(interpreter c, char *x, bag b)
+static void print_help(char *x)
 {
     for (int j = 0; (j < sizeof(command_body)/sizeof(struct command)); j++) {
         command c = &commands[j];
@@ -184,7 +215,6 @@ int main(int argc, char **argv)
 {
     init_runtime();
     bag root = (bag)create_edb(init, 0);
-    interpreter interp = build_lua();
     commands = command_body;
 
     tests = allocate_vector(init, 5);
@@ -204,7 +234,7 @@ int main(int argc, char **argv)
             }
         }
         if (c) {
-            c->f(interp, argv[i+1], root);
+            c->f(argv[i+1]);
             if (c->argument) i++;
         } else {
             prf("\nUnknown flag %s, aborting\n", argv[i]);
@@ -212,16 +242,6 @@ int main(int argc, char **argv)
         }
     }
 
-    bag content = (bag)create_edb(init, 0);
-    // linker sets?
-    register(content, "/", "text/html", index);
-    register(content, "/jssrc/renderer.js", "application/javascript", renderer);
-    register(content, "/jssrc/microReact.js", "application/javascript", microReact);
-    register(content, "/jssrc/codemirror.js", "application/javascript", codemirror);
-    register(content, "/jssrc/codemirror.css", "text/css", codemirrorCss);
-    register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
-
-    prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
 
     vector_foreach(tests, t)
         run_test(root, read_file_or_exit(init, t), enable_tracing);
