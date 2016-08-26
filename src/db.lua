@@ -344,7 +344,7 @@ end
 
 function Bag:_sync(eav)
   if not self.cbag then
-    self.cbag = create_edb(self.id.value)
+    self.cbag = create_edb()
   end
 
   local hash = EAV.hash(eav)

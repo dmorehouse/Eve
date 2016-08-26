@@ -307,8 +307,7 @@ int lua_build_node(lua_State *L)
 int lua_create_edb(lua_State *L)
 {
     interpreter c = lua_context(L);
-    uuid id = lua_tovalue(L, 1);
-    bag b = (bag)create_edb(c->h, id, 0);
+    bag b = (bag)create_edb(c->h, 0);
 
     lua_pushlightuserdata(L, b);
     return 1;

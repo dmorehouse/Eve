@@ -263,24 +263,6 @@ int main(int argc, char **argv)
         }
     }
 
-<<<<<<< HEAD
-=======
-    http_server h = create_http_server(create_station(0, port), server_eve);
-    register(h, "/", "text/html", index);
-    register(h, "/jssrc/renderer.js", "application/javascript", renderer);
-    register(h, "/jssrc/microReact.js", "application/javascript", microReact);
-    register(h, "/jssrc/codemirror.js", "application/javascript", codemirror);
-    register(h, "/jssrc/codemirror.css", "text/css", codemirrorCss);
-    register(h, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
-    register(h, "/jssrc/commonmark.js", "application/javascript", commonmark);
-    register(h, "/jssrc/editor.js", "application/javascript", editor);
-
-    // TODO: figure out a better way to manage multiple graphs
-    init_json_service(h, root, enable_tracing, compiler_bag, exec_path);
-
-    prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
->>>>>>> origin/feature/reflection
-
     vector_foreach(tests, t)
         run_test(root, read_file_or_exit(init, t), enable_tracing);
 
