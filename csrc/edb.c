@@ -192,12 +192,13 @@ static void edb_commit(edb b, edb source)
         edb_insert(b, e, a, v, m, block_id);
 }
 
-int buffer_unicode_length(buffer buf)
+static int buffer_unicode_length(buffer buf, int start)
 {
     int length = 0;
-    rune_foreach(buf, c) {
-        length++;
-    }
+    int limit = buffer_length(buf);
+    for (u32 x = start, q;  
+         (q = utf8_length(*(u32 *)bref(buf, x))),  x<limit;                       
+         x += q) length++;
     return length;
 }
 
@@ -230,17 +231,16 @@ string edb_dump(heap h, edb b)
 {
     buffer out = allocate_string(h);
     table_foreach(b->eav, e, avl) {
-        int start = buffer_unicode_length(out);
+        int start = buffer_length(out);
         bprintf(out, "%v ", e);
-
-        int ind = buffer_unicode_length(out)-start;
+        int ind = buffer_unicode_length(out, start);
         int first =0;
 
         table_foreach((table)avl, a, vl) {
             int second = 0;
-            int start = buffer_unicode_length(out);
+            int start = buffer_length(out);
             bprintf(out, "%S%v ", first++?ind:0, a);
-            int ind2 = buffer_unicode_length(out)-start;
+            int ind2 = buffer_unicode_length(out, start) + ((first==1)?ind:0);
             table_foreach((table)vl, v, _)
                 bprintf(out, "%S%v\n", second++?ind2:0, v);
         }

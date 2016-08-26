@@ -1084,6 +1084,7 @@ function sanitize(obj, mapping, flattenArray)
     neue.mutateType = obj.mutateType
     neue.bindings = sanitize(obj.bindings, mapping, true)
     neue.queries = sanitize(obj.queries, mapping)
+    neue.unpacked = sanitize(obj.unpacked, mapping)
   end
 
   return neue

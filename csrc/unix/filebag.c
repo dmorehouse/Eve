@@ -146,6 +146,7 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
             int res = stat(path_of_file(f), &st);
             if (sig & a_sig) {
                 if (sig & v_sig) {
+                    prf("filebag EAV %v %v %v %v\n", e, a, v, fb->root->u);
                     if (((a == sym(tag)) && (v == sym(root)) && (e == fb->root->u)) ||
                         filebag_eav_check(fb, f, &st, out, e, a, v))
                         apply(out, e, a, v, 1, 0);
@@ -168,8 +169,9 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
         if ((sig == s_eAv) && (a ==sym(child))) {
             // ech -- recurse
             fill_children(fb, fb->root);
-            table_foreach(fb->root->children, _, u) {
-                apply(out, fb->root, a, u, 1, 0);
+            // just root
+            table_foreach(fb->root->children, _, f) {
+                apply(out, fb->root->u, a, ((file)f)->u, 1, 0);
             }
         }
     }

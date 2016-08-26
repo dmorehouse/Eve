@@ -1,0 +1,30 @@
+start path resolution
+```
+  match
+     r = [#test-start]
+     split[text:"/examples/flappy.eve" token index, by:"/"]
+  bind
+     [#path index token]
+```
+
+start eve program
+```
+  match
+     [#path index token]
+     final = [#path index: count[given :index] file]
+  commit
+     [#zikky final]
+```
+
+resolve a path
+```
+match
+    p = [#path index]
+    (file, ind) = if index = 1 then ([#root], 1)
+                               else (p.file, index)
+    cpath = [#path index:(ind + 1)]
+    c = file.child
+    c.name = npath.token
+bind
+    path.file := c
+```

@@ -189,7 +189,5 @@ static evaluation build_process(buffer source,
     // fixme refactor
     table_set(scopes, sym(compiler), compiler_uuid);
     table_set(inputs, compiler_uuid, compiler_bag);
-
-    prf("build process with %d blocks\n", vector_length(n));
     return build_evaluation(h, scopes, inputs, r, e, n);
 }
