@@ -63,9 +63,15 @@ static void do_split(perf p, execf n,
                 store(r, token, intern_buffer(out));
                 store(r, index, box_float(ind++));
                 j = 0;
-                out = 0;
+                buffer_clear(out);
                 apply(n, h, p, op, r);
             }
+        }
+        if (out && buffer_length(out)){
+            // dup
+            store(r, token, intern_buffer(out));
+            store(r, index, box_float(ind++));
+            apply(n, h, p, op, r);
         }
     } else apply(n, h, p, op, r);
     stop_perf(p, pp);
