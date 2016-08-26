@@ -300,7 +300,7 @@ function presort(nodes, typeCost)
     local cheapestCost = 2^52
     local cheapestIx
     for ix, node in ipairs(idSorted) do
-      local cost = (typeCost[node.type] or 600) + node.deps.provides:length() * 10 - node.deps.depends:length()
+      local cost = (typeCost[node.type] or 600) - node.deps.provides:length() - node.deps.depends:length() * 10
       if cost < cheapestCost then
         cheapest = node
         cheapestCost = cost
@@ -1062,14 +1062,19 @@ function sanitize(obj, mapping, flattenArray)
       end
     end
   elseif obj.type == "code" then
+    neue.tag = "parse-graph"
     neue.ast = sanitize(obj.ast, mapping)
     neue.children = sanitize(obj.children, mapping, true)
     neue.context = sanitize(obj.context, mapping)
   elseif obj.type == "context" then
-    neue.errors = sanitize(obj.errors, mapping)
-    neue.tokens = sanitize(obj.tokens, mapping)
+    for _, token in ipairs(obj.tokens) do
+      token.tag = "token"
+    end
+    neue.tokens = sanitize(obj.tokens, mapping, true)
     neue.downEdges = sanitize(obj.downEdges, mapping)
-    neue.comments = sanitize(obj.comments, mapping)
+    neue.errors = sanitize(obj.errors, mapping, true)
+    neue.comments = sanitize(obj.comments, mapping, true)
+    neue.code = sanitize(obj.code, mapping)
   elseif obj.type == "variable" then
     neue.generated = obj.generated
     neue.cardinal = sanitize(obj.cardinal, mapping)
@@ -1077,6 +1082,10 @@ function sanitize(obj, mapping, flattenArray)
     neue.field = obj.field
     neue.variable = sanitize(obj.variable, mapping)
     neue.constant = obj.constant and obj.constant.constant
+  elseif obj.tag == "token" then -- Some kind of token
+    for k, v in pairs(obj) do
+      neue[k] = sanitize(v, mapping)
+    end
   else -- Some kind of node
     neue.deps = sanitize(obj.deps, mapping)
     neue.operator = obj.operator

@@ -150,6 +150,7 @@ static void dump_tree(file f, listener out)
 CONTINUATION_1_5(filebag_scan, filebag, int, listener, value, value, value);
 void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
 {
+    if (a == sym(contents)) prf ("filebag scan: %d %v %v %v\n", sig, e,a ,v);
     if (sig & e_sig) {
         file f = table_find(fb->idmap, e);
         if (f) {

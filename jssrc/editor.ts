@@ -1,4 +1,11 @@
+import * as commonmark from "commonmark";
+import {CodeMirror} from "CodeMirror";
+import {sendSwap, sendSave, sendParse} from "./client";
+import {setActiveIds, renderer, renderEditor} from "./renderer";
+
 let parser = new commonmark.Parser();
+
+let codeEditor:any;
 
 function Span(start, len, source) {
   this.start = start;
@@ -38,6 +45,14 @@ function createFullClear(editor, mark) {
   }
 }
 
+function addMarkClasses(editor, type, line) {
+  if(typeToBgClass[type]) {
+    editor.addLineClass(line, "background", typeToBgClass[type]);
+  } else if(typeToTextClass[type]) {
+    editor.addLineClass(line, "text", typeToTextClass[type]);
+  }
+}
+
 function addMark(editor, from, to, source) {
   let className = source.type.toUpperCase();
   if(className == "HEADING") {
@@ -62,11 +77,7 @@ function addMark(editor, from, to, source) {
       end += 1;
     }
     for(let line = start; line < end; line++) {
-      if(typeToBgClass[type]) {
-        editor.addLineClass(line, "background", typeToBgClass[type]);
-      } else if(typeToTextClass[type]) {
-        editor.addLineClass(line, "text", typeToTextClass[type]);
-      }
+      addMarkClasses(editor, type, line)
     }
     marker.clear = createFullClear(editor, marker);
   }
@@ -165,7 +176,15 @@ function toMarkdown(editor) {
       pieces.push("**");
     } else if(type == "code") {
       pieces.push("`");
-    } else if(type == "code_block") {
+    } else if(type == "code_block" && mark.start) {
+      pieces.push("```\n");
+    } else if(type == "code_block" && !mark.start) {
+      // if the last character of the block is not a \n, we need to
+      // add one since the closing fence must be on its own line.
+      let last = pieces[pieces.length - 1];
+      if(last[last.length - 1] !== "\n") {
+        pieces.push("\n");
+      }
       pieces.push("```\n");
     } else if(type == "item" && mark.start && source._listData.type == "bullet") {
       pieces.push("- ");
@@ -200,6 +219,7 @@ function getCodeBlocks(editor) {
     if(!mark.source) continue;
     if(mark.source.type == "code_block") {
       blocks.push(mark);
+      let loc = mark.find();
     }
   }
   return blocks;
@@ -209,23 +229,24 @@ function doSwap(editor) {
   sendSwap(toMarkdown(editor));
 }
 
-function doSave() {
+export function doSave() {
   sendSave(toMarkdown(codeEditor));
 }
 
-function handleEditorParse(parse) {
+export function handleEditorParse(parse) {
+  if(!codeEditor) return;
   let parseLines = parse.lines;
-  let from = {};
-  let to = {};
+  let from:any = {};
+  let to:any = {};
   let ix = 0;
-  let parseBlocks = parse.root.children;
+  let parseBlocks = parse.blocks;
   codeEditor.operation(function() {
     for(let block of getCodeBlocks(codeEditor)) {
       if(!parseBlocks[ix]) continue;
       let loc = findMark(block);
       let fromLine = loc.from.line;
       let toLine = loc.to.line;
-      let parseStart = parse[parseBlocks[ix]].line;
+      let parseStart = parseBlocks[ix].line;
       let offset = parseStart - fromLine + 1;
 
       for(let line = fromLine; line < toLine; line++) {
@@ -239,7 +260,6 @@ function handleEditorParse(parse) {
         to.line = line;
         let tokens = parseLines[line + offset];
         if(tokens) {
-          let firstToken = tokens[0];
           let state;
           for(let token of tokens) {
             from.ch = token.surrogateOffset;
@@ -413,6 +433,10 @@ function formatItalic(editor) {
   doFormat(editor, "emph");
 }
 
+function formatCode(editor) {
+  doFormat(editor, "code");
+}
+
 function formatHeader(editor) {
   doLineFormat(editor, {type: "heading1", level: "1"});
 }
@@ -421,10 +445,26 @@ function formatList(editor) {
   doLineFormat(editor, {type: "item", _listData: {type: "bullet"}});
 }
 
-function getMarksByType(editor, type, start, stop) {
+function formatCodeBlock(editor) {
+  editor.operation(function() {
+    let cursor = editor.getCursor("from");
+    let to = {line: cursor.line, ch: 0};
+    let text = editor.getLine(cursor.line);
+    if(text !== "") {
+      to.line += 1;
+    }
+    addMark(editor, {line: cursor.line, ch: 0}, to, {type: "code_block"});
+  });
+}
+
+function getMarksByType(editor, type, start, stop?, inclusive?) {
   let marks;
   if(start && stop && !samePos(start, stop)) {
-    marks = editor.findMarks(start, stop);
+    if(inclusive) {
+      marks = editor.findMarks({line: start.line, ch: start.ch - 1}, {line: stop.line, ch: stop.ch + 1});
+    } else {
+      marks = editor.findMarks(start, stop);
+    }
   } else if(start) {
     marks = editor.findMarksAt(start);
   } else {
@@ -466,11 +506,13 @@ function makeEditor() {
       "Cmd-I": formatItalic,
       "Cmd-E": formatHeader,
       "Cmd-Y": formatList,
+      "Cmd-K": formatCodeBlock,
+      "Cmd-L": formatCode,
     })
   });
   editor.dirtyLines = [];
   editor.formatting = {};
-  editor.formats = ["strong", "emph"];
+  editor.formats = ["strong", "emph", "code"];
   editor.on("beforeChange", function(editor, change) {
     let {from, to, text} = change;
     if(change.origin === "+delete") {
@@ -479,6 +521,15 @@ function makeEditor() {
         // clear the old bookmark
         mark.clear();
         change.cancel();
+      }
+      marks = getMarksByType(editor, "code_block", to);
+      for(let mark of marks) {
+        let loc = findMark(mark);
+        if(loc.from == loc.to) {
+          // clear the old bookmark
+          mark.clear();
+          change.cancel();
+        }
       }
     }
     if(change.origin === "+input") {
@@ -505,6 +556,32 @@ function makeEditor() {
         let nextLine = {line: from.line + 1, ch: 0};
         let parentSource = marks[0].source;
         addMark(editor, nextLine, nextLine, {type: parentSource.type, _listData: parentSource._listData});
+      }
+
+      // check if we're adding a new line inside of a code_block. If so, that line is also a
+      // code_block line
+      let codeBlockMarks = getMarksByType(editor, "code_block", to);
+      if(codeBlockMarks.length) {
+        let mark = codeBlockMarks[0];
+        let loc = findMark(mark);
+        if(samePos(from, loc.from)) {
+          mark.clear();
+          if(isNewlineChange(change)) {
+            let newTo = {line: adjusted.line + 1, ch: 0};
+            let marker = addMark(editor, {line: loc.from.line, ch: 0}, newTo, mark.source);
+          } else {
+            // if we're typing at the beginning of a code_block, we need to
+            // extend the block
+            let newTo = loc.to;
+            if(comparePos(adjusted, newTo) > 0) {
+              newTo = {line: adjusted.line + 1, ch: 0};
+            }
+            let marker = addMark(editor, {line: loc.from.line, ch: 0}, newTo, mark.source);
+          }
+        } else if(isNewlineChange(change)) {
+          addMarkClasses(editor, "code_block", from.line);
+          addMarkClasses(editor, "code_block", from.line + 1);
+        }
       }
 
       // handle formatting
@@ -540,6 +617,67 @@ function makeEditor() {
         // clear the old bookmark
         mark.clear();
       }
+
+      let codeBlockMarks = getMarksByType(editor, "code_block", from, to, "inclusive");
+      for(let mark of codeBlockMarks) {
+        let loc = findMark(mark);
+        // if the code_block is now empty, then we need to turn this mark into
+        // a bookmark
+        if(editor.getRange(loc.from, loc.to) === "\n") {
+          mark.clear();
+          addMark(editor, loc.from, loc.from, mark.source);
+        } else if(loc.to.ch !== 0) {
+          // if we removed the end of the block, we have to make sure that this mark
+          // ends up terminating at the beginning of the next line.
+          let to = {line: from.line + 1, ch: 0};
+          mark.clear();
+          addMark(editor, loc.from, to, mark.source);
+          // we then have to check if any formatting marks ended up in here
+          // and remove them
+          for(let containedMark of editor.findMarks(loc.from, to)) {
+            if(containedMark.source && containedMark.source.type !== "code_block") {
+              containedMark.clear();
+            }
+          }
+        }
+      }
+    } else if(change.origin === "paste") {
+      let codeBlockMarks = getMarksByType(editor, "code_block", from);
+      for(let mark of codeBlockMarks) {
+        let loc = findMark(mark);
+
+        if(samePos(from, loc.from) || comparePos(loc.to, from) > 0) {
+          // mark all the pasted lines with the code classes
+          let ix = 0;
+          for(let text of change.text) {
+            addMarkClasses(editor, "code_block", from.line + ix);
+            ix++;
+          }
+        }
+
+        if(samePos(from, loc.from)) {
+          mark.clear();
+          // if we're typing at the beginning of a code_block, we need to
+          // extend the block
+          let newTo = {line: adjusted.line + change.text.length, ch: 0};
+          let marker = addMark(editor, {line: loc.from.line, ch: 0}, newTo, mark.source);
+        }
+
+        if(loc.to.ch !== 0) {
+          // if we removed the end of the block, we have to make sure that this mark
+          // ends up terminating at the beginning of the next line.
+          let to = {line: from.line + 1, ch: 0};
+          mark.clear();
+          addMark(editor, loc.from, to, mark.source);
+          // we then have to check if any formatting marks ended up in here
+          // and remove them
+          for(let containedMark of editor.findMarks(loc.from, to)) {
+            if(containedMark.source && containedMark.source.type !== "code_block") {
+              containedMark.clear();
+            }
+          }
+        }
+      }
     }
   });
   editor.on("cursorActivity", function(editor) {
@@ -566,11 +704,12 @@ function injectCodeMirror(node, elem) {
     codeEditor = makeEditor();
     let editor = codeEditor;
     node.editor = editor;
-    node.editor.on("cursorActivity", function() {
-      let pos = editor.getCursor();
-      activeIds = nodeToRelated(pos, posToToken(pos, renderer.tree[elem.id].parse.lines), renderer.tree[elem.id].parse);
-      drawNodeGraph();
-    });
+    // @FIXME: Disabled per @chris's advice
+    // node.editor.on("cursorActivity", function() {
+    //   let pos = editor.getCursor();
+    //   setActiveIds(nodeToRelated(pos, posToToken(pos, renderer.tree[elem.id].parse.lines), renderer.tree[elem.id].parse));
+    //   renderEditor();
+    // });
     injectMarkdown(editor, elem.value);
     editor.clearHistory();
     node.appendChild(editor.getWrapperElement());
@@ -578,21 +717,21 @@ function injectCodeMirror(node, elem) {
   }
 }
 
-function setKeyMap(event) {
+export function setKeyMap(event) {
   codeEditor.setOption("keyMap", event.currentTarget.value);
 }
 
-function CodeMirrorNode(info) {
+export function CodeMirrorNode(info) {
   info.postRender = injectCodeMirror;
   info.c = "cm-container";
   return info;
 }
 
-function compileAndRun() {
+export function compileAndRun() {
   doSwap(codeEditor);
 }
 
-function applyFix(event, elem) {
+export function applyFix(event, elem) {
   //we need to do the changes in reverse order to ensure
   //the positions remain the same?
   let changes = elem.fix.changes.slice();
@@ -608,4 +747,3 @@ function applyFix(event, elem) {
   }
   doSwap(codeEditor);
 }
-

@@ -42,13 +42,14 @@ static void send_error_terminal(heap h, char* message, bag data, uuid data_id)
 {
     void * address = __builtin_return_address(1);
     string stack = allocate_string(h);
-    get_stack_trace(&stack);
+    // xxx - figure out why stack trace is busted :/
+    //    get_stack_trace(&stack);
 
-    prf("ERROR: %s\n  stage: executor\n  offsets:\n%b", message, stack);
+    prf("ERROR: %s\n  stage: executor\n", message);
 
     if(data != 0) {
       string data_string = edb_dump(h, (edb)data);
-      prf("  data: ⦑%v⦒\n%b", data_id, data);
+      prf("  data: ⦑%v⦒\n%b", data_id, data_string);
     }
     destroy(h);
 }
@@ -95,6 +96,20 @@ static void run_eve_http_server(char *x)
     // the spoopy orderer and the octopus-less compiler to do some
     // really stupid things...turn off for debugging
 #if 0
+    register(h, "/", "text/html", index);
+    register(h, "/js/microReact.js", "application/javascript", microReact_js);
+    register(h, "/js/codemirror.js", "application/javascript", codemirror_js);
+    register(h, "/js/codemirror.css", "text/css", codemirror_css);
+    register(h, "/examples/todomvc.css", "text/css", todomvc_css);
+    register(h, "/js/commonmark.js", "application/javascript", commonmark_js);
+    register(h, "/js/system.js", "application/javascript", system_js);
+
+    register(h, "/js/util.js", "application/javascript", util_js);
+    register(h, "/js/client.js", "application/javascript", client_js);
+    register(h, "/js/renderer.js", "application/javascript", renderer_js);
+    register(h, "/js/editor.js", "application/javascript", editor_js);
+
+
     // linker sets?
     register(content, "/", "text/html", index);
     register(content, "/jssrc/renderer.js", "application/javascript", renderer);
