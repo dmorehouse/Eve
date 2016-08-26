@@ -3,7 +3,9 @@ start path resolution
   match
      r = [#test-start]
      split[text:"/examples/flappy.eve" token index, by:"/"]
+     fr = [#root]
   bind
+     [#path index:1 file:fr]
      [#path index token]
 ```
 
@@ -19,12 +21,9 @@ start eve program
 resolve a path
 ```
 match
-    p = [#path index]
-    (file, ind) = if index = 1 then ([#root], 1)
-                               else (p.file, index)
-    cpath = [#path index:(ind + 1)]
-    c = file.child
-    c.name = npath.token
+    [#path index:pindex file:pfile]
+    f = pfile.child
+    child = [#path index:(pindex + 1) token:f.name]
 bind
-    path.file := c
+    child.file := f
 ```

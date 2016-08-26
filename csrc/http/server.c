@@ -21,29 +21,28 @@ void http_send_response(http_server s, bag b, uuid root)
 {
     bag shadow = (bag)b;
     estring body;
-    uuid connection_uuid = lookupv((edb)b, root, sym(connection));
-    uuid response = root;
-    session hs = table_find(s->sessions, connection_uuid);
+    session hs = table_find(s->sessions, root);
 
-    prf("send response: %p %p\n", response, s);
-    if (!s || !response) return;
     // type checking or coersion
-    value header = lookupv((edb)b, root, sym(header));
+    value response = lookupv((edb)b, root, sym(response));
+    if (hs && response) {
+        value header = lookupv((edb)b, response, sym(header));
 
-    if ((body = lookupv((edb)b, root, sym(body))) && (type_of(body) == estring_space)) {
-        // dont shadow because http header can't handle it because edb_foreach
-        //                shadow = (bag)create_edb(hs->h, 0, build_vector(hs->h, s));
-        apply(shadow->insert, header, sym(Content-Length), box_float(body->length), 1, 0);
-    }
+        if ((body = lookupv((edb)b, response, sym(content))) && (type_of(body) == estring_space)) {
+            // dont shadow because http header can't handle it because edb_foreach
+            //                shadow = (bag)create_edb(hs->h, 0, build_vector(hs->h, s));
+            apply(shadow->insert, header, sym(Content-Length), box_float(body->length), 1, 0);
+        }
 
-    http_send_header(hs->write, shadow, header,
-                     sym(HTTP/1.1),
-                     lookupv((edb)shadow, response, sym(status)),
-                     lookupv((edb)shadow, response, sym(reason)));
-    if (body) {
-        // xxx - leak the wrapper
-        buffer b = wrap_buffer(hs->h, body->body, body->length);
-        apply(hs->write, b, ignore);
+        http_send_header(hs->write, shadow, header,
+                         sym(HTTP/1.1),
+                         lookupv((edb)shadow, response, sym(status)),
+                         lookupv((edb)shadow, response, sym(reason)));
+        if (body) {
+            // xxx - leak the wrapper
+            buffer b = wrap_buffer(hs->h, body->body, body->length);
+            apply(hs->write, b, ignore);
+        }
     }
 }
 
@@ -59,10 +58,13 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
         return;
     }
 
-    prf("request: %b %v\n", edb_dump(init, (edb)b), i);
 
     bag event = (bag)create_edb(s->h, build_vector(s->h, b));
     uuid x = generate_uuid();
+
+    // sadness
+    table_set(s->parent->sessions, x, s);
+
     apply(event->insert, x, sym(tag), sym(http-request), 1, 0);
     apply(event->insert, x, sym(request), i, 1, 0);
     apply(event->insert, x, sym(connection), s->self, 1, 0);

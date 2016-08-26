@@ -3,24 +3,44 @@ start path resolution
   match
      r = [#http-request]
      split[text:r.request.url token index, by:"/"]
+     fr = [#root]
   bind
+     [#path index:1 file:fr]
      [#path index token]
      [#content-type suffix:"jpeg" type:"application/jpeg"]
      [#content-type suffix:"css" type:"text/css"]
      [#content-type suffix:"html" type:"text/html"]
 ```
 
+resolve a path
+```
+match
+    [#path index:pindex file:pfile]
+    f = pfile.child
+    child = [#path index:(pindex + 1) token:f.name]
+bind
+    child.file := f
+```
+
+path search complete
+```
+match
+     [#path index token]
+     final = [#path index: count[given :index] file]
+     split[text:final.token by:"." token:extoken index:exindex]
+     exindex = 2
+bind
+     [#request-object extension:extoken file]
+```
+
 complete! send content response
 ```
   match
-     [#path index token]
-     final = [#path index: count[given :index] file]
-     split[text:final.token by:"." token index]
-     index = 2
-     not(token = "eve")
+     r = [#http-request]
+     [#request-object extension file]
      ct = [#content-type suffix:token]
-  commit
-     [#http-response
+  bind
+     r.response := [
        body: file.body
        status:"200"
        reason:"OK"
@@ -31,60 +51,41 @@ complete! send content response
 initiate eve program
 ```
   match
-     [#path index token]
-     final = [#path index: count[given :index] file]
-     split[text:final.token by:"." token index]
-     index = 2
-     ct = [#content-type suffix:token]
-  commit
-     [#http-response
-       body: file.body
+     r = [#http-request]
+     [#request-object extension:"eve" file]
+     [#root child:[name:"jssrc" child:[name:"renderer.js" contents]]]
+  bind
+     r.response := [content: contents
        status:"200"
        reason:"OK"
-       header:[Content-Type:ct.type]]
+       header:[Content-Type:"application/json"]]
 ```
 
 
 start eve program
 ```
   match
-     [#path index token]
-     final = [#path index: count[given :index] file]
-     split[text:final.token by:"." token index]
-     index = 2
-     token = "eve"
-  commit
+     r = [#http-request header:[zikky]]
+     [#request-object extension:"eve" file]
+  bind
      // ok, here we need to
         // build an environment for the new process
         // start the new process
-        // upgrade the socket to the websocket
-     [#http-response]
-
+       // upgrade the socket to the websocket
+     r.response := [body: file.body
+       status:"200"
+       reason:"OK"
+       header:[Content-Type:ct.type]]
 ```
 
 no such file!
 ```
    match
-      [#http-request connection]
-      [#path index:f token]
-      not([#path index:count[given: f] file])
-   commit @event
-      [connection
-       status:"404"
-       reason:"No such object"
-       header: [Server: "Eve"]
-       body: ""]
-```
-
-resolve a path
-```
-match
-    p = [#path index]
-    (file, ind) = if index = 1 then ([#root], 1)
-                               else (p.file, index)
-    npath = [#path index:(ind + 1)]
-    c = file.child
-    c.name = npath.token
-bind
-    path.file := c
+      r = [#http-request]
+      not(r.response)
+   bind
+      r.response :=
+       [status:"404"
+        reason:"No such object"
+        body: ""]
 ```

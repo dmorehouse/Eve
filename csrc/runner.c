@@ -103,6 +103,7 @@ static void shadow_p_by_t_and_f(evaluation ev, listener result,
 
 void merge_scan(evaluation ev, vector scopes, int sig, listener result, value e, value a, value v)
 {
+    /* xxx - since we went to all the trouble - we should only be looking at bags in scopes */
     multibag_foreach(ev->t_input, u, b)
         apply(((bag)b)->scan, sig,
               cont(ev->working, shadow_p_by_t_and_f, ev, result),
@@ -321,13 +322,13 @@ static boolean fixedpoint(evaluation ev)
     table_set(ev->counters, intern_cstring("iterations"), (void *)iterations);
     table_set(ev->counters, intern_cstring("cycle-time"), (void *)ev->cycle_time);
     // counters? reflection? enable them
-    apply(ev->complete, ev->t_solution, ev->f_solution);
+    apply(ev->complete, ev->t_solution, ev->last_f_solution);
 
     prf ("fixedpoint in %t seconds, %d blocks, %V iterations, %d changes to global, %d maintains, %t seconds handler\n",
          end_time-start_time, vector_length(ev->blocks),
          counts,
          multibag_count(ev->t_solution),
-         multibag_count(ev->f_solution),
+         multibag_count(ev->last_f_solution),
          now() - end_time);
     destroy(ev->working);
     return true;

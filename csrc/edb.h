@@ -62,10 +62,16 @@ edb create_edb(heap, vector inherits);
     table_foreach((table)__vl, __v, __cv)\
     for(multiplicity __c = ((leaf)__cv)->m , __z = 0; __z == 0; __z++)
 
-#define edb_foreach_a(__b, __e, __a, __v, __c)\
+#define edb_foreach_ev(__b, __e, __a, __v, __c)\
     for(table __avt = (table)table_find((__b)->ave, __a); __avt; __avt = 0)  \
     table_foreach((table)__avt, __v, __ect)\
     table_foreach((table)__ect, __e, __cv)\
+    for(multiplicity __c = ((leaf)__cv)->m , __z = 0; __z == 0; __z++)
+
+#define edb_foreach_v(__b, __e, __a, __v, __c)\
+    for(table __av = (table)table_find((__b)->eav, __e); __av; __av = 0)  \
+    for(table __vv = (table)table_find(__av, __a); __vv; __vv = 0)  \
+    table_foreach((table)__vv, __v, __cv)\
     for(multiplicity __c = ((leaf)__cv)->m , __z = 0; __z == 0; __z++)
 
 #define edb_foreach_e(__b, __e, __a, __v, __c)\

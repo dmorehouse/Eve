@@ -61,7 +61,7 @@ static void do_split(perf p, execf n,
             }
             if (j == k->length) {
                 store(r, token, intern_buffer(out));
-                store(r, index, box_float(ind++));
+                store(r, index, box_float(++ind));
                 j = 0;
                 buffer_clear(out);
                 apply(n, h, p, op, r);
@@ -70,7 +70,7 @@ static void do_split(perf p, execf n,
         if (out && buffer_length(out)){
             // dup
             store(r, token, intern_buffer(out));
-            store(r, index, box_float(ind++));
+            store(r, index, box_float(++ind));
             apply(n, h, p, op, r);
         }
     } else apply(n, h, p, op, r);
@@ -78,6 +78,7 @@ static void do_split(perf p, execf n,
 }
 
 
+// xxx - bound index and bound filter are just split
 static execf build_split_bound_index(block bk, node n)
 {
     return cont(bk->h, do_split,

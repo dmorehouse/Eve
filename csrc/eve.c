@@ -64,13 +64,13 @@ static CONTINUATION_3_2(http_eval_result, http_server *, table, uuid, multibag, 
 static void http_eval_result(http_server *h, table inputs, uuid where, multibag t, multibag f)
 {
     bag b;
-    if (!t || (!(b=table_find(t, where)))) {
-        prf("empty http eval result %d\n", t?table_elements(t):0);
+    if (!f || (!(b=table_find(f, where)))) {
+        prf("empty http eval result %d\n", t?table_elements(f):0);
     } else {
-        edb_foreach_a((edb)b, e, sym(connection), v, m) {
-            prf("http eval result:\n %b\n", edb_dump(init, table_find(t, where)));
+        edb_foreach_ev((edb)b, e, sym(response), response, m){
+            // xxx we're using e as a very weak correlator to the connection
             http_send_response(*h, b, e);
-            table_set(inputs, where, create_edb(init, 0));
+            return;
         }
     }
 }
@@ -90,7 +90,6 @@ static void run_eve_http_server(char *x)
     build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
 
-
     bag content = (bag)create_edb(init, 0);
     // xxx - the use of the same attribute as a request is causing
     // the spoopy orderer and the octopus-less compiler to do some
@@ -109,7 +108,7 @@ static void run_eve_http_server(char *x)
     http_server *server = allocate(h, sizeof(http_server));
     evaluation ev = build_process(b, enable_tracing, scopes, persisted,
                                   cont(h, http_eval_result, server, persisted,
-                                       table_find(scopes, sym(event))),
+                                       table_find(scopes, sym(session))),
                                   cont(h, handle_error_terminal));
 
     *server = create_http_server(create_station(0, port), ev);

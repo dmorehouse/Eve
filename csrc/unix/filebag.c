@@ -113,13 +113,15 @@ static void fill_children(filebag fb, file f)
     struct dirent *d;
 
     // should also remove files that are no longer there
+    // xxx = need to fix dot files and cycles
     while((d = readdir(x))) {
         int namelen = MAXNAMLEN - (sizeof(struct dirent) - d->d_reclen);
         file child;
-        estring cname = intern_cstring(d->d_name);
-
-        if ((!f->children) || !(child = table_find(f->children, cname)))
-            name_file(fb->h, allocate_file(fb, f, generate_uuid()), cname);
+        if (d->d_name[0] != '.') {
+            estring cname = intern_cstring(d->d_name);
+            if ((!f->children) || !(child = table_find(f->children, cname)))
+                name_file(fb->h, allocate_file(fb, f, generate_uuid()), cname);
+        }
     }
 }
 
@@ -134,19 +136,27 @@ static void filebag_e_scan(filebag fb, file f, listener out, value e, value a)
 }
 
 
+// xxx - we're not scanning forward here X child Y
+static void dump_tree(file f, listener out)
+{
+    table_foreach(f->children, _, c) {
+        file child = c;
+        apply(out, f->u, sym(child), child->u, 1, 0);
+        // xxx - cycles
+        if (child->children) dump_tree(c, out);
+    }
+}
+
 CONTINUATION_1_5(filebag_scan, filebag, int, listener, value, value, value);
 void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
 {
-    prf("filebag scan: %d %v %v %v\n", sig, e, a, v);
     if (sig & e_sig) {
         file f = table_find(fb->idmap, e);
         if (f) {
-            prf("filebag scan e %d %v %v %v\n", sig, e, a, v);
             struct stat st;
             int res = stat(path_of_file(f), &st);
             if (sig & a_sig) {
                 if (sig & v_sig) {
-                    prf("filebag EAV %v %v %v %v\n", e, a, v, fb->root->u);
                     if (((a == sym(tag)) && (v == sym(root)) && (e == fb->root->u)) ||
                         filebag_eav_check(fb, f, &st, out, e, a, v))
                         apply(out, e, a, v, 1, 0);
@@ -163,16 +173,11 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
         }
     } else {
         if ((sig == s_eAV) && (a == sym(tag)) && (v == sym(root))) {
-            prf("filebag returning root: %v\n", fb->root->u);
             apply(out, fb->root->u, a, v, 1, 0);
         }
         if ((sig == s_eAv) && (a ==sym(child))) {
-            // ech -- recurse
             fill_children(fb, fb->root);
-            // just root
-            table_foreach(fb->root->children, _, f) {
-                apply(out, fb->root->u, a, ((file)f)->u, 1, 0);
-            }
+            dump_tree(fb->root, out);
         }
     }
     // silently drop all inquries about free entities...we can filter on attribute, but value..man..
@@ -186,21 +191,21 @@ void filebag_insert(filebag f, value e, value a, value v, multiplicity m, uuid b
 CONTINUATION_1_1(filebag_commit, filebag, edb)
 void filebag_commit(filebag fb, edb s)
 {
-    edb_foreach_a(s, e, sym(child), v, m) {
+    edb_foreach_ev(s, e, sym(child), v, m) {
         file parent;
         if ((parent = table_find(fb->idmap, e))){
             allocate_file(fb, parent, v);
         }
     }
 
-    edb_foreach_a(s, e, sym(name), v, m) {
+    edb_foreach_ev(s, e, sym(name), v, m) {
         file f;
         if ((f = table_find(fb->idmap, e))) {
             name_file(fb->h, f, v);
         }
     }
 
-    edb_foreach_a(s, e, sym(contents), v, m) {
+    edb_foreach_ev(s, e, sym(contents), v, m) {
         file f;
         estring contents = v;
         // xxx ordering
