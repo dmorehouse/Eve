@@ -95,6 +95,7 @@ http_server create_http_server(station p, evaluation ev)
 {
     heap h = allocate_rolling(pages, sstring("server"));
     http_server s = allocate(h, sizeof(struct http_server));
+
     s->h = h;
     s->ev = ev;
     s->sessions = create_value_table(h);

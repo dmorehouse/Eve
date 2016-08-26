@@ -1,5 +1,37 @@
 #include <runtime.h>
 #include <luanne.h>
+#include <http/http.h>
+
+extern string edb_dump(heap h, edb b);
+
+static void lua_stack_dump (lua_State *L) {
+    int i;
+    int top = lua_gettop(L);
+    for (i = 1; i <= top; i++) {  /* repeat for each level */
+        int t = lua_type(L, i);
+        switch (t) {
+
+        case LUA_TSTRING:  /* strings */
+            printf("%d. `%s'", i, lua_tostring(L, i));
+            break;
+
+        case LUA_TBOOLEAN:  /* booleans */
+            printf("%d. %s", i, lua_toboolean(L, i) ? "true" : "false");
+            break;
+
+        case LUA_TNUMBER:  /* numbers */
+            printf("%d. %g", i, lua_tonumber(L, i));
+            break;
+
+        default:  /* other values */
+            printf("%d. %s", i, lua_typename(L, t));
+            break;
+
+        }
+        printf(",  ");  /* put a separator */
+    }
+    printf("\n");  /* end the listing */
+}
 
 static char *luat(lua_State *L, int index)
 {
@@ -120,7 +152,7 @@ static int lua_print_value(lua_State *L)
     interpreter c = lua_context(L);
     string out = allocate_string(c->h);
     print_value(out, x);
-    lua_pushlstring(L, bref(out->contents, 0), buffer_length(out));
+    lua_pushlstring(L, bref(out, 0), buffer_length(out));
     return 1;
 }
 
@@ -159,7 +191,7 @@ void require_luajit(interpreter c, char *z)
     lua_setglobal(c->L, z);
 }
 
-vector lua_compile_eve(interpreter c, heap h, buffer b, boolean tracing, buffer *out)
+vector lua_compile_eve(interpreter c, heap h, buffer b, boolean tracing, bag *compiler_bag)
 {
     vector result = allocate_vector(h, 3);
     lua_pushcfunction(c->L, traceback);
@@ -172,10 +204,11 @@ vector lua_compile_eve(interpreter c, heap h, buffer b, boolean tracing, buffer 
         printf ("lua error\n");
         printf ("%s\n", lua_tostring(c->L, -1));
     }
-    
-    *out = lua_to_buffer(c->L, -1, h);
+
+    *compiler_bag = lua_tovalue(c->L, 5);
+
     int count = 0;
-    foreach_lua_table(c->L, -2, k, v) {
+    foreach_lua_table(c->L, 4, k, v) {
         compiled n = allocate(c->h, sizeof(struct compiled));
         foreach_lua_table(c->L, v, k0, v0) {
             value kv = lua_tovalue(c->L, k0);
@@ -226,7 +259,7 @@ extern void bundle_add_loaders(lua_State* L);
 vector vector_from_lua(heap h, lua_State *L, int index)
 {
     vector res = allocate_vector(h, 5);
-    foreach_lua_table(L, index, _, v) 
+    foreach_lua_table(L, index, _, v)
         vector_insert(res, lua_tovalue(L, v));
     return res;
 }
@@ -253,11 +286,14 @@ int lua_build_node(lua_State *L)
                      (lua_type(L, v) == LUA_TTABLE)?
                   vector_from_lua(c->h, L, v):
                   lua_tovalue(L, v));
-        
-        table_set(n->display,lua_tovalue(c->L, k),
-                  (lua_type(L, v) == LUA_TTABLE)?
-                  aprintf(c->h,"%V", vector_from_lua(c->h, L, v)):
-                  aprintf(c->h,"%r", lua_tovalue(L, v)));
+
+        string out = allocate_string(c->h);
+        if(lua_type(L, v) == LUA_TTABLE) {
+            print_value_vector_json(out, vector_from_lua(c->h, L, v));
+        } else {
+            print_value_json(out, lua_tovalue(L, v));
+        }
+        table_set(n->display, lua_tovalue(c->L, k), out);
     }
 
     // xxx - shouldn't really be a value
@@ -265,6 +301,39 @@ int lua_build_node(lua_State *L)
     n->id = node_id;
 
     lua_pushlightuserdata(L, n);
+    return 1;
+}
+
+int lua_create_edb(lua_State *L)
+{
+    interpreter c = lua_context(L);
+    uuid id = lua_tovalue(L, 1);
+    bag b = (bag)create_edb(c->h, id, 0);
+
+    lua_pushlightuserdata(L, b);
+    return 1;
+}
+
+int lua_insert_edb(lua_State *L)
+{
+    interpreter c = lua_context(L);
+    bag b = (bag) lua_touserdata(L, 1);
+    value e = (value) lua_touserdata(L, 2);
+    value a = (value) lua_touserdata(L, 3);
+    value v = (value) lua_touserdata(L, 4);
+    int m = (int)lua_tonumber(L, 5);
+    apply(b->insert, e, a, v, m, 0);
+
+    return 0;
+}
+
+int lua_dump_edb(lua_State *L)
+{
+    interpreter c = lua_context(L);
+    bag b = (bag) lua_touserdata(L, 1);
+    string out = edb_dump(c->h, (edb) b);
+    lua_pushlstring(L, bref(out, 0), buffer_length(out));
+
     return 1;
 }
 
@@ -277,7 +346,7 @@ interpreter build_lua()
     interpreter c = allocate(h, sizeof(struct interpreter));
     c->L = luaL_newstate();
     c->h = h;
-    
+
     luaL_openlibs(c->L);
     bundle_add_loaders(c->L);
 
@@ -287,9 +356,13 @@ interpreter build_lua()
     define(c, "sregister", construct_register);
     define(c, "sboolean", construct_boolean);
     define(c, "sstring", construct_string);
+    define(c, "generate_uuid", lua_gen_uuid);
     define(c, "value_to_string", lua_print_value);
     define(c, "build_node", lua_build_node);
     define(c, "node_id", node_id);
+    define(c, "create_edb", lua_create_edb);
+    define(c, "insert_edb", lua_insert_edb);
+    define(c, "dump_edb", lua_dump_edb);
     require_luajit(c, "compiler");
     return c;
 }
@@ -310,15 +383,16 @@ interpreter get_lua()
 void free_lua(interpreter lua)
 {
     // luc_gc(lua->l, LUA_GCCOLLECT, 0);
+    lua_settop(lua->L, 1);
     lua->next = freelist;
     freelist = lua;
 }
 
-vector compile_eve(heap h, buffer b, boolean tracing, buffer *desc)
+vector compile_eve(heap h, buffer b, boolean tracing, bag *compiler_bag)
 {
     interpreter lua = get_lua();
     lua->h = h;
-    vector v = lua_compile_eve(lua, h, b, tracing, desc);
+    vector v = lua_compile_eve(lua, h, b, tracing, compiler_bag);
     free_lua(lua);
     return v;
 }

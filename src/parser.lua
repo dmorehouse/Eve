@@ -671,9 +671,10 @@ local function parse(tokens, context)
       if stackTop.type == "query" and stackTop.line + 1 == token.line then
         stackTop.doc = stackTop.doc .. "\n" .. token.value
         stackTop.line = token.line
+      elseif stackTop.type == "query" and #stackTop.children == 0 then
+        stack:pop()
+        stack:push(makeNode(context, "query", token, {doc = token.value, children = {}}))
       else
-        -- clear everything currently on the stack as we're starting a totally new
-        -- query
         stackTop = tryFinishExpression(true)
         stack:push(makeNode(context, "query", token, {doc = token.value, children = {}}))
       end
@@ -683,6 +684,8 @@ local function parse(tokens, context)
       -- then this starts one
       if stackTop.type ~= "query" then
         stack:push(makeNode(context, "query", token, {doc = "Unnamed block", children = {}}))
+      else
+        stackTop.line = token.line
       end
 
     elseif type == "BLOCK_CLOSE" then
@@ -860,7 +863,7 @@ local function parse(tokens, context)
       -- consume the paren
       scanner:read()
 
-    elseif type == "IDENTIFIER" or type == "NUMBER" or type == "STRING" or type == "UUID" or type == "BOOLEAN" then
+    elseif type == "IDENTIFIER" or type == "NUMBER" or type == "STRING" or type == "UUID" or type == "BOOLEAN" or type == "NONE" then
       stackTop.children[#stackTop.children + 1] = token
 
     else
@@ -1014,6 +1017,9 @@ local function resolveMutate(context, node)
     -- foo <- [ ... ]
     if node.operator == "set" then
       if rightNode.type == "NONE" then
+        context.mutateOperator = "erase"
+        right = resolveExpression(makeNode(context, "object", node, {children = {}}), context)
+        context.mutateOperator = "set"
         -- TODO
       else
         -- error the only valid thing to set a reference to directly
@@ -1261,6 +1267,14 @@ resolveExpression = function(node, context)
 
   if node.type == "NUMBER" or node.type == "STRING" or node.type == "UUID" or node.type == "BOOLEAN" then
     return makeNode(context, "constant", node, {constant = node.value, constantType = node.type:lower()})
+
+  elseif node.type == "NONE" then
+    if context.mutateOperator == "erase" or context.mutateOperator == "set" then
+      return makeNode(context, "constant", node, {constant = node.value, constantType = node.type:lower()})
+    else
+      -- error
+      errors.invalidNone(context, node)
+    end
 
   elseif node.type == "variable" or node.type == "constant" then
     return node

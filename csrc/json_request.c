@@ -3,17 +3,6 @@
 #include <http/http.h>
 #include <luanne.h>
 
-
-// FIXME: because we allow you to swap the program out, we have to have
-// a way to swap out the root parse graph. For now, we're doing this as
-// a global, which locks us into having only one program running, but
-// we should figure out a way to close over this in some useful way, while
-// allowing updating the program.
-static buffer root_graph;
-static char *exec_path;
-
-extern thunk ignore;
-
 static CONTINUATION_1_0(send_destroy, heap);
 static void send_destroy(heap h)
 {
@@ -154,11 +143,11 @@ void new_json_session(evaluation ev,
     uuid su = generate_uuid();
 
     json_session session = allocate(h, sizeof(struct json_session));
+    session->graph = 0; // @FIXME: remove this completely
     session->h = h;
     session->session = (bag)create_edb(h, 0);
     session->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("trash")));
     session->browser_uuid = generate_uuid();
-    session->graph = root_graph;
     session->eh = allocate_rolling(pages, sstring("eval"));
 
 

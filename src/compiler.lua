@@ -319,11 +319,14 @@ DependencyGraph = {}
 
 function DependencyGraph:new(obj)
   obj = obj or {}
+
   -- Essential state
+  obj.id = obj.id or db.UUID:new()
   obj.unprepared = obj.unprepared or Set:new() -- set of nodes that must still be prepared prior to ordering
   obj.unsorted = obj.unsorted or Set:new() -- set of nodes that need to be ordered
   obj.sorted = obj.sorted or {} -- append-only set of ordered nodes
 
+  -- Cached state
   obj.providers = obj.providers or {} -- Set of nodes capable of providing a term
   obj.dependents = obj.dependents or {} -- Sets of nodes depending on a term
   obj.bound = obj.bound or Set:new() -- Set of terms bound by the currently ordered set of nodes
@@ -971,6 +974,130 @@ function DependencyGraph.__tostring(dg)
   return result .. "\n}"
 end
 
+function DependencyGraph:toRecord(mapping)
+  mapping = mapping or {}
+  local nodeRecords = Set:new()
+
+  for node in pairs(self.unprepared or nothing) do
+    local nodeRecord = sanitize(node, mapping)
+    nodeRecord.tag = Set:new({"node", "unprepared"})
+    nodeRecords:add(nodeRecord)
+  end
+  for node in pairs(self.unsorted or nothing) do
+    local nodeRecord = sanitize(node, mapping)
+    nodeRecord.tag = Set:new({"node", "unsorted"})
+    nodeRecords:add(nodeRecord)
+  end
+  for ix, node in ipairs(self.sorted or nothing) do
+    local nodeRecord = sanitize(node, mapping)
+    nodeRecord.tag = Set:new({"node", "sorted"})
+    nodeRecord.sort = ix
+    nodeRecords:add(nodeRecord)
+  end
+
+  local groupRecords = Set:new()
+  for group in pairs(self.termGroups) do
+    groupRecords:add({
+      tag = "term-group",
+      terms = group
+    })
+  end
+
+  local query = sanitize(self.query, mapping)
+  if not self.parent then
+    query.tag = Set:new({"node", "block"})
+  end
+
+  return {
+    name = self.query.name,
+    tag = "dependency-graph",
+    query = query,
+    nodes = nodeRecords,
+    terms = sanitize(self.terms, mapping),
+    groups = sanitize(groupRecords, mapping)
+  }
+end
+
+function DependencyGraph:addToBag(bag)
+  bag:addRecord(self:toRecord(), self.id)
+  return bag
+end
+
+function sanitize(obj, mapping, flattenArray)
+  if not mapping then mapping = {} end
+  if not obj or type(obj) ~= "table" then return obj end
+  if mapping[obj] then return mapping[obj] end
+
+  local meta = getmetatable(obj)
+  local neue = setmetatable({type = obj.type, name = obj.name, id = obj.id, line = obj.line, offset = obj.offset}, meta)
+  mapping[obj] = neue
+
+  if meta == Set then
+    neue = Set:new()
+    mapping[obj] = neue
+    for v in pairs(obj) do
+      neue:add(sanitize(v, mapping))
+    end
+  elseif meta == DependencyGraph then
+    neue = obj:toRecord(mapping)
+    mapping[obj] = neue
+  elseif not obj.type then
+    if flattenArray and util.isArray(obj) then
+      -- If the object is purely an array and flattenArray is true, turn it into a set with sorts on it.
+      neue = Set:new()
+      mapping[obj] = neue
+
+      for ix, v in ipairs(obj) do
+        local sv = sanitize(v, mapping)
+        if not sv.sort then
+          sv.sort = ix
+        end
+        neue:add(sv)
+      end
+    else
+      -- Otherwise keep it as a full sub-record
+      for k, v in pairs(obj) do
+        local sk, sv = sanitize(k, mapping), sanitize(v, mapping)
+        neue[sk] = sv
+      end
+    end
+  elseif obj.type == "code" then
+    neue.ast = sanitize(obj.ast, mapping)
+    neue.children = sanitize(obj.children, mapping, true)
+    neue.context = sanitize(obj.context, mapping)
+  elseif obj.type == "context" then
+    neue.errors = sanitize(obj.errors, mapping)
+    neue.tokens = sanitize(obj.tokens, mapping)
+    neue.downEdges = sanitize(obj.downEdges, mapping)
+    neue.comments = sanitize(obj.comments, mapping)
+  elseif obj.type == "variable" then
+    neue.generated = obj.generated
+    neue.cardinal = sanitize(obj.cardinal, mapping)
+  elseif obj.type == "binding" then
+    neue.field = obj.field
+    neue.variable = sanitize(obj.variable, mapping)
+    neue.constant = obj.constant and obj.constant.constant
+  else -- Some kind of node
+    neue.deps = sanitize(obj.deps, mapping)
+    neue.operator = obj.operator
+    neue.scopes = obj.scopes
+    neue.mutateType = obj.mutateType
+    neue.bindings = sanitize(obj.bindings, mapping, true)
+    neue.queries = sanitize(obj.queries, mapping)
+  end
+
+  return neue
+end
+
+function parseGraphToRecord(parseGraph, mapping)
+  mapping = mapping or {}
+  return sanitize(parseGraph, mapping)
+end
+
+function parseGraphAddToBag(parseGraph, bag)
+  local record = parseGraphToRecord(parseGraph)
+  bag:addRecord(record, parseGraph.id)
+end
 
 ScanNode = {}
 function ScanNode:new(obj)
@@ -1015,9 +1142,13 @@ function ScanNode:fromBinding(source, binding, entity, context)
   obj.mutateType = source.mutateType
   obj.scopes = source.scopes
   obj.entity = entity
-  obj.attribute = binding.field
-  obj.value = binding.variable or binding.constant
-  context.downEdges[#context.downEdges + 1] = {obj.value.id, obj.id}
+  if binding.field ~= ENTITY_FIELD then
+    obj.attribute = binding.field
+    obj.value = binding.variable or binding.constant
+  end
+  if obj.value then
+    context.downEdges[#context.downEdges + 1] = {obj.value.id, obj.id}
+  end
   return obj
 end
 
@@ -1133,7 +1264,11 @@ function unpackObjects(dg, context)
               unpackList[#unpackList + 1] = ScanNode:fromBinding(node, binding, entity, context)
             end
           elseif #node.bindings == 1 then
-            error("Eliding only binding on object: " .. tostring(node))
+            if node.operator == "erase" then
+              unpackList[#unpackList + 1] = ScanNode:fromBinding(node, {}, entity, context)
+            else
+              error("Eliding only binding on object: " .. tostring(node))
+            end
           end
         end
       end
@@ -1192,6 +1327,8 @@ end
 function compileExec(contents, tracing)
   local parseGraph = parser.parseString(contents)
   local context = parseGraph.context
+  context.type = "context"
+  context.compilerBag = db.Bag:new({name = "compiler"})
 
   if context.errors and #context.errors ~= 0 then
     return {}, util.toFlatJSON(parseGraph), {}
@@ -1205,20 +1342,28 @@ function compileExec(contents, tracing)
     local head, regs
     -- @NOTE: We cannot allow dead DGs to still try and run, they may be missing filtering hunks and fire all sorts of missiles
     if not dependencyGraph.ignore then
-      head, regs = build.build(queryGraph, tracing, parseGraph.context)
+      dependencyGraph:addToBag(context.compilerBag)
+      head, regs = build.build(queryGraph, tracing, context)
       set[#set+1] = {head = head, regs = regs, name = queryGraph.name}
     end
   end
+
+  parseGraphAddToBag(parseGraph, context.compilerBag)
+
+
   if context.errors and #context.errors ~= 0 then
     print("Bailing due to errors.")
-    return {}, util.toFlatJSON(parseGraph)
+    return {}, context.compilerBag.cbag
   end
-  return set, util.toFlatJSON(parseGraph)
+  return set, context.compilerBag.cbag
 end
 
 function analyze(content, quiet)
   local parseGraph = parser.parseString(content)
   local context = parseGraph.context
+  context.type = "context"
+  context.compilerBag = db.Bag:new({name = "compiler"})
+
   if context.errors and #context.errors ~= 0 then
     print("Bailing due to errors.")
     return 0
@@ -1250,6 +1395,11 @@ function analyze(content, quiet)
     end
     print("  }")
   end
+
+
+  print("--- BAG ---")
+  parseGraphAddToBag(parseGraph, context.compilerBag)
+  context.compilerBag:print()
 
   if context.errors and #context.errors ~= 0 then
     print("Bailing due to errors.")

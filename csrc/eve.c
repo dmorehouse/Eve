@@ -4,7 +4,7 @@
 #include <luanne.h>
 
 static boolean enable_tracing = false;
-static buffer loadedParse;
+static bag compiler_bag;
 static char *exec_path;
 static int port = 8080;
 // defer these until after everything else has been set up
@@ -32,7 +32,7 @@ station create_station(unsigned int address, unsigned short port) {
 }
 
 
-extern void init_json_service(http_server, uuid, boolean, buffer, char*);
+extern void init_json_service(http_server, uuid, boolean, bag, char*);
 extern int strcmp(const char *, const char *);
 static buffer read_file_or_exit(heap, char *);
 
@@ -132,6 +132,7 @@ static void run_test(bag root, buffer b, boolean tracing)
     heap h = allocate_rolling(pages, sstring("command line"));
     table scopes = create_value_table(h);
     table persisted = create_value_table(h);
+
     build_bag(scopes, persisted, "all", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "session", (bag)create_edb(h, 0));
     // maybe?
@@ -262,6 +263,23 @@ int main(int argc, char **argv)
         }
     }
 
+<<<<<<< HEAD
+=======
+    http_server h = create_http_server(create_station(0, port), server_eve);
+    register(h, "/", "text/html", index);
+    register(h, "/jssrc/renderer.js", "application/javascript", renderer);
+    register(h, "/jssrc/microReact.js", "application/javascript", microReact);
+    register(h, "/jssrc/codemirror.js", "application/javascript", codemirror);
+    register(h, "/jssrc/codemirror.css", "text/css", codemirrorCss);
+    register(h, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
+    register(h, "/jssrc/commonmark.js", "application/javascript", commonmark);
+    register(h, "/jssrc/editor.js", "application/javascript", editor);
+
+    // TODO: figure out a better way to manage multiple graphs
+    init_json_service(h, root, enable_tracing, compiler_bag, exec_path);
+
+    prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
+>>>>>>> origin/feature/reflection
 
     vector_foreach(tests, t)
         run_test(root, read_file_or_exit(init, t), enable_tracing);

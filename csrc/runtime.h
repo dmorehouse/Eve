@@ -79,6 +79,7 @@ typedef struct compiled {
     string name;
     node head;
     int regs;
+    bag compiler_bag;
 } *compiled;
 
 struct block {
@@ -134,9 +135,13 @@ void close_evaluation(evaluation);
 
 extern char *pathroot;
 
-vector compile_eve(heap h, buffer b, boolean tracing, buffer *desc);
+
+vector compile_eve(heap h, buffer b, boolean tracing, bag *compiler_bag);
+
 evaluation build_evaluation(heap h, table scopes, table persisted,
-                            evaluation_result e, error_handler error, vector implications);
+                            evaluation_result e, error_handler error,
+                            vector implications);
+
 void run_solver(evaluation s);
 void inject_event(evaluation, bag);
 void block_close(block);
@@ -177,7 +182,14 @@ static evaluation build_process(buffer source,
 {
     buffer desc;
     heap h = allocate_rolling(pages, sstring("eval"));
-    vector n = compile_eve(h, source, tracing, &desc);
+    bag compiler_bag;
+    vector n = compile_eve(h, source, tracing, &compiler_bag);
+    uuid compiler_uuid = generate_uuid();
+
+    // fixme refactor
+    table_set(scopes, sym(compiler), compiler_uuid);
+    table_set(inputs, compiler_uuid, compiler_bag);
+
     prf("build process with %d blocks\n", vector_length(n));
     return build_evaluation(h, scopes, inputs, r, e, n);
 }
