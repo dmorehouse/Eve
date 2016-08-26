@@ -116,19 +116,24 @@
   </head>
   <body>
     <script type="text/javascript" src="/jssrc/codemirror.js"></script>
-
+    <script type="text/javascript" src="/jssrc/commonmark.js"></script>
+    <script type="text/javascript" src="/jssrc/microReact.js"></script>
     <script type="text/javascript" src="/jssrc/system.js"></script>
     <script>
       SystemJS.config({
         baseURL: "/build",
         defaultJSExtensions: true,
-        meta: {
-          codemirror: {format: "amd"}
-        }
       });
       // Kicks off requiring everyone else
       SystemJS.register("CodeMirror", [], function($export) {
         $export("CodeMirror", CodeMirror);
+      });
+      SystemJS.register("microReact", [], function($export) {
+        $export("microReact", Renderer);
+      });
+      SystemJS.register("commonmark", [], function($export) {
+        console.log(commonmark)
+        $export("commonmark", commonmark.commonmark);
       });
       SystemJS.import("client");
     </script>

@@ -50,3 +50,7 @@ build/Eve.xcodeproj/*/xcuserdata
 build/lua
 build/luajit-2.0
 
+build/client.js
+build/editor.js
+build/renderer.js
+build/util.js
