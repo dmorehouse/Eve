@@ -1,9 +1,9 @@
-import * as commonmark from "commonmark";
-import {CodeMirror} from "CodeMirror";
+import {Parser} from "commonmark";
+import * as CodeMirror from "CodeMirror";
 import {sendSwap, sendSave, sendParse} from "./client";
 import {setActiveIds, renderer, renderEditor} from "./renderer";
 
-let parser = new commonmark.Parser();
+let parser = new Parser();
 
 let codeEditor:any;
 

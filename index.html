@@ -126,14 +126,14 @@
       });
       // Kicks off requiring everyone else
       SystemJS.register("CodeMirror", [], function($export) {
-        $export("CodeMirror", CodeMirror);
+        $export(CodeMirror);
       });
       SystemJS.register("microReact", [], function($export) {
-        $export("microReact", Renderer);
+        $export("Renderer", Renderer);
       });
       SystemJS.register("commonmark", [], function($export) {
         console.log(commonmark)
-        $export("commonmark", commonmark.commonmark);
+        $export(commonmark);
       });
       SystemJS.import("client");
     </script>
