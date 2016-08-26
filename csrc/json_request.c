@@ -81,100 +81,6 @@ static void send_diff(heap h, buffer_handler output, values_diff diff)
     apply(output, out, cont(h, send_destroy, h));
 }
 
-
-static void send_full_parse(heap h, buffer_handler output, string parse)
-{
-    string out = allocate_string(h);
-    bprintf(out, "{\"type\":\"full_parse\", \"parse\": ");
-    buffer_append(out, bref(parse, 0), buffer_length(parse));
-    bprintf(out, "}");
-    apply(output, out, cont(h, send_destroy, h));
-}
-
-static void dump_display(buffer dest, node source)
-{
-    boolean first=true;
-    bprintf(dest, "{");
-    table_foreach(source->display, k, v) {
-        // @FIXME: Correctly print variadic arguments
-        if(k != sym(variadic)) {
-            bprintf(dest, "%s%v: \"%b\"", !first?", ":"", k, v);
-            first = false;
-        }
-    }
-    bprintf(dest, "}");
-}
-
-static void send_cnode_graph(heap h, buffer_handler output, node head)
-{
-    string out = allocate_string(h);
-
-    bprintf(out, "{\"type\":\"node_graph\", \"head\": \"%v\", \"nodes\":{", head->id);
-    vector to_scan = allocate_vector(h, 10);
-    vector_insert(to_scan, head);
-    int nodeComma = 0;
-    vector_foreach(to_scan, n){
-        node current = (node) n;
-        if(nodeComma) {
-            bprintf(out, ",");
-        }
-        bprintf(out, "\"%v\": {\"id\": \"%v\", \"type\": %v, \"arms\": [", current->id, current->id, current->type);
-        int needsComma = 0;
-        vector_foreach(current->arms, arm) {
-            vector_insert(to_scan, arm);
-            if(needsComma) {
-                bprintf(out, ",");
-            }
-            bprintf(out, "\"%v\"", ((node)arm)->id);
-            needsComma = 1;
-        }
-        bprintf(out, "]");
-
-        // xxx is in display props now
-        if(current->type == intern_cstring("scan")) {
-            bprintf(out, ", \"scan_type\": %v", table_find(current->arguments, sym(sig)));
-        }
-        bprintf(out, ", \"display\":");
-        dump_display(out, current);
-
-        bprintf(out, "}");
-        nodeComma = 1;
-    }
-
-    bprintf(out, "}");
-    bprintf(out, "}");
-    apply(output, out, ignore);
-}
-
-static void send_node_times(heap h, buffer_handler output, node head, table counts)
-{
-    string out = allocate_string(h);
-    u64 time = (u64)table_find(counts, sym(time));
-    u64 cycle_time = (u64)table_find(counts, sym(cycle-time));
-    u64 iterations = (u64)table_find(counts, sym(iterations));
-
-    bprintf(out, "{\"type\":\"node_times\", \"total_time\": %t, \"cycle_time\": %u, \"iterations\": %d, \"head\": \"%v\", \"nodes\":{", time, cycle_time, iterations, head->id);
-    vector to_scan = allocate_vector(h, 10);
-    vector_insert(to_scan, head);
-    int nodeComma = 0;
-    vector_foreach(to_scan, n){
-        node current = (node) n;
-        vector_foreach(current->arms, arm) {
-            vector_insert(to_scan, arm);
-        }
-        perf p = table_find(counts, current);
-        if(p) {
-            if(nodeComma) bprintf(out, ",");
-            bprintf(out, "\"%v\": {\"count\": %u, \"time\": %l}", current->id, p->count, p->time);
-            nodeComma = 1;
-        }
-    }
-
-    bprintf(out, "}");
-    bprintf(out, "}");
-    apply(output, out, ignore);
-}
-
 // solution should already contain the diffs against persisted...except missing support (diane)
 static CONTINUATION_1_3(send_response, json_session, multibag, multibag, table);
 static void send_response(json_session session, multibag t_solution, multibag f_solution, table counters)
@@ -233,39 +139,22 @@ void handle_json_query(json_session session, bag in, uuid root)
         return;
     }
 
-    estring t = lookupv((edb)in, root, sym(type));
-    estring q = lookupv((edb)in, root, sym(query));
-    buffer desc;
-    string x = q?alloca_wrap_buffer(q->body, q->length):0;
-
-    if (t == sym(query)) {
-        inject_event(session->ev, x, session->tracing);
-    }
-
-    if (t == sym(parse)) {
-        send_parse(session, alloca_wrap_buffer(q->body, q->length));
-    }
-
-    if (t == sym(save)) {
-        write_file(exec_path, alloca_wrap_buffer(q->body, q->length));
-    }
+    // in is going to take some deconstruction here, but you know....stuff
+    inject_event(session->ev, in);
 }
 
 
-// build_evaluation(session->scopes, session->persisted, cont(session->h, send_response, session), cont(session->h, handle_error, session));
-CONTINUATION_2_4(new_json_session,
-                 bag, boolean,
-                 buffer_handler, bag, uuid, register_read)
-void new_json_session(bag root, boolean tracing,
-                      buffer_handler write, bag b, uuid u, register_read reg)
+void new_json_session(evaluation ev,
+                      buffer_handler write,
+                      bag b,
+                      uuid u,
+                      register_read reg)
 {
     heap h = allocate_rolling(pages, sstring("session"));
     uuid su = generate_uuid();
 
     json_session session = allocate(h, sizeof(struct json_session));
     session->h = h;
-    session->root = root;
-    session->tracing = tracing;
     session->session = (bag)create_edb(h, 0);
     session->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("trash")));
     session->browser_uuid = generate_uuid();
@@ -278,6 +167,4 @@ void new_json_session(bag root, boolean tracing,
                                       parse_json(session->eh, cont(h, handle_json_query, session)),
                                       reg);
 
-
-    inject_event(session->ev, aprintf(session->h,"init!\n```\nbind\n      [#session-connect]\n```"), session->tracing);
 }

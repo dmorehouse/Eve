@@ -68,15 +68,12 @@ struct node {
     table display;
 };
 
-
 #include <edb.h>
+#include <multibag.h>
 
-typedef table multibag;
-
-typedef closure(evaluation_result, multibag, multibag, table);
+typedef closure(evaluation_result, multibag, multibag);
 
 typedef closure(block_completion, boolean);
-
 
 typedef struct compiled {
     string name;
@@ -112,7 +109,7 @@ struct evaluation  {
     // map from names to uuids
 
     vector blocks;
-    vector event_blocks;
+    bag event_bag;
 
     table counters;
     ticks t;
@@ -141,7 +138,7 @@ vector compile_eve(heap h, buffer b, boolean tracing, buffer *desc);
 evaluation build_evaluation(heap h, table scopes, table persisted,
                             evaluation_result e, error_handler error, vector implications);
 void run_solver(evaluation s);
-void inject_event(evaluation, buffer b, boolean);
+void inject_event(evaluation, bag);
 void block_close(block);
 bag init_request_service();
 

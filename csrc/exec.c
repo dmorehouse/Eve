@@ -502,7 +502,6 @@ table builders_table()
 static void force_node(block bk, node n)
 {
     if (!table_find(bk->nmap, n)){
-        prf("build %v\n", n->type);
         execf *x = allocate(bk->h, sizeof(execf *));
         table_set(bk->nmap, n, x);
         vector_foreach(n->arms, i) force_node(bk, i);

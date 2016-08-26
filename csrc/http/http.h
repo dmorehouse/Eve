@@ -3,21 +3,7 @@ http_server create_http_server(station p, evaluation ev);
 
 void http_send_request(buffer_handler w, bag b, uuid n);
 
-void send_http_response(heap h,
-                        buffer_handler write,
-                        char * status,
-                        string type,
-                        buffer b);
-
-void register_http_service(http_server s,
-                           string url,
-                           thunk apply);
-
-void register_http_file(http_server s,
-                        string url,
-                        string pathname,
-                        string mimetype);
-
+void http_send_response(http_server hs, bag b, uuid root);
 
 string base64_encode(heap h, buffer x);
 

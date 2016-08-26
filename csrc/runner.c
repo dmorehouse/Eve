@@ -1,49 +1,5 @@
 #include <runtime.h>
 
-#define multibag_foreach(__m, __u, __b)  if(__m) table_foreach(__m, __u, __b)
-
-// should these guys really reconcile their differences
-static inline int multibag_count(table m)
-{
-    int count = 0;
-    multibag_foreach(m, u, b)
-        count += edb_size(b);
-    return count;
-}
-
-static boolean compare_multibags(multibag a, multibag b)
-{
-    bag d;
-    if (!a != !b) return false; // if one is zero and the other not, not equal
-    if (!a) return true;        // both are empty
-
-    table_foreach(a, u, ab) {
-        bag bb = table_find(b, u);
-        if (!bb) return false;
-        if (edb_size((edb)ab) != edb_size((edb)bb))
-            return false;
-
-        edb_foreach((edb)ab, e, a, v, c, _) {
-            if (count_of((edb)bb, e, a, v) != c) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-void multibag_insert(multibag *mb, heap h, uuid u, value e, value a, value v, multiplicity m, uuid block_id)
-{
-    bag b;
-
-    prf("mbi: %v %v %v\n", e, a, v);
-    if (!*mb) (*mb) = create_value_table(h);
-    if (!(b = table_find((*mb), u)))
-        table_set(*mb, u, b = (bag)create_edb(h, 0));
-
-    apply(b->insert, e, a, v, m, block_id);
-}
-
 // debuggin
 static estring bagname(evaluation e, uuid u)
 {
@@ -161,6 +117,11 @@ void merge_scan(evaluation ev, vector scopes, int sig, listener result, value e,
         apply(((bag)b)->scan, sig,
               cont(ev->working, shadow_f_by_p_and_t, ev, result),
               e, a, v);
+
+    if (ev->event_bag)
+        apply(ev->event_bag->scan, sig,
+              cont(ev->working, shadow_f_by_p_and_t, ev, result),
+              e, a, v);
 }
 
 static CONTINUATION_1_0(evaluation_complete, evaluation);
@@ -218,7 +179,6 @@ static boolean merge_solution_into_t(multibag *m, heap h, uuid u, bag s)
 
 static void run_block(evaluation ev, block bk)
 {
-    prf("running %v\n", bk->name);
     heap bh = allocate_rolling(pages, sstring("block run"));
     bk->ev->block_t_solution = 0;
     bk->ev->block_f_solution = 0;
@@ -289,11 +249,10 @@ static boolean fixedpoint(evaluation ev)
     ev->t = start_time;
     boolean again;
     vector t_diffs = allocate_vector(ev->working, 2);
-
     ev->t_solution = 0;
+
     do {
         again = false;
-        ev->f_solution =  0;
         vector f_diffs = allocate_vector(ev->working, 2);
 
         do {
@@ -302,16 +261,9 @@ static boolean fixedpoint(evaluation ev)
             ev->last_f_solution = ev->f_solution;
             ev->f_solution = 0;
 
-            prf("fp: %d %d\n", vector_length(ev->event_blocks), vector_length(ev->blocks));
-
-            if (ev->event_blocks)
-                vector_foreach(ev->event_blocks, b)
-                    run_block(ev, b);
-            
-            vector_foreach(ev->blocks, b) {
-                prf("wtf: %v\n", ((block)b)->name);
+            vector_foreach(ev->blocks, b)
                 run_block(ev, b);
-            }
+
 
             if(iterations > (MAX_F_ITERATIONS - 1)) { // super naive 2-cycle diff capturing
                 vector_insert(f_diffs, diff_sets(ev->working, ev->last_f_solution, ev->f_solution));
@@ -332,9 +284,10 @@ static boolean fixedpoint(evaluation ev)
             vector_insert(t_diffs, diff);
         }
 
+        ev->event_bag = 0;
         vector_insert(counts, box_float((double)iterations));
         iterations = 0;
-        ev->event_blocks = 0;
+        ev->f_solution =  0;
 
         multibag_foreach(ev->t_solution_for_f, u, b)
             again |= merge_solution_into_t(&ev->t_solution, ev->working, u, b);
@@ -367,8 +320,8 @@ static boolean fixedpoint(evaluation ev)
     table_set(ev->counters, intern_cstring("time"), (void *)(end_time - start_time));
     table_set(ev->counters, intern_cstring("iterations"), (void *)iterations);
     table_set(ev->counters, intern_cstring("cycle-time"), (void *)ev->cycle_time);
-    // ??
-    apply(ev->complete, ev->t_solution, ev->f_solution, ev->counters);
+    // counters? reflection? enable them
+    apply(ev->complete, ev->t_solution, ev->f_solution);
 
     prf ("fixedpoint in %t seconds, %d blocks, %V iterations, %d changes to global, %d maintains, %t seconds handler\n",
          end_time-start_time, vector_length(ev->blocks),
@@ -382,23 +335,17 @@ static boolean fixedpoint(evaluation ev)
 
 static void setup_evaluation(evaluation ev)
 {
-    ev->event_blocks = 0;
     ev->working = allocate_rolling(pages, sstring("working"));
+    ev->f_solution = 0;
+    ev->event_bag = 0;
     ev->t = now();
 }
 
-void inject_event(evaluation ev, buffer b, boolean tracing)
+void inject_event(evaluation ev, bag event)
 {
-    buffer desc;
+    // event bag just shows up and isn't addressable, think about changing that
     setup_evaluation(ev);
-    vector c = compile_eve(ev->working, b, tracing, &desc);
-
-    vector_foreach(c, i) {
-        if (!ev->event_blocks)
-            ev->event_blocks = allocate_vector(ev->working, vector_length(c));
-        vector_insert(ev->event_blocks, build(ev, i));
-    }
-
+    ev->event_bag = event;
     fixedpoint(ev);
 }
 
@@ -430,6 +377,7 @@ evaluation build_evaluation(heap h,
     evaluation ev = allocate(h, sizeof(struct evaluation));
     ev->h = h;
     ev->error = error;
+    // consider adding "event" to the running namespace
     ev->scopes = scopes;
     ev->t_input = t_input;
     ev->counters =  allocate_table(h, key_from_pointer, compare_pointer);
@@ -438,14 +386,15 @@ evaluation build_evaluation(heap h,
     ev->complete = r;
     ev->terminal = cont(ev->h, evaluation_complete, ev);
     ev->run = cont(h, run_solver, ev);
-
     ev->default_insert_scopes = table_find(scopes, sym(session));
+
     if (!ev->default_insert_scopes)
         prf("proceeding without a default insert target (usually session)\n");
 
     ev->default_scan_scopes = allocate_vector(h, table_elements(scopes));
-    table_foreach(scopes, n, u)
+    table_foreach(scopes, n, u) {
         vector_insert(ev->default_scan_scopes, u);
+    }
 
 
     table_foreach(ev->t_input, uuid, z) {
@@ -453,11 +402,10 @@ evaluation build_evaluation(heap h,
         table_set(b->listeners, ev->run, (void *)1);
     }
 
-    // xxx - reflecton
+    // xxx - compiler output reflecton
     vector_foreach(implications, i) {
         // xxx - shouldn't build take the termination?
         vector_insert(ev->blocks, build(ev, i));
-        prf ("build block: %v\n", ((compiled)i)->name);
     }
 
     return ev;

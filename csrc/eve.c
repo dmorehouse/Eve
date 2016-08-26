@@ -59,15 +59,22 @@ static void handle_error_terminal(char * message, bag data, uuid data_id) {
 }
 
 
-static CONTINUATION_1_3(test_result, heap, multibag, multibag,  table);
-static void test_result(heap h, multibag t, multibag f, table counts)
+
+static CONTINUATION_3_2(http_eval_result, http_server *, table, uuid, multibag, multibag);
+static void http_eval_result(http_server *h, table inputs, uuid where, multibag t, multibag f)
 {
-    if (f) {
-        table_foreach(f, n, v) {
-            prf("result: %v %b\n", n, edb_dump(h, (edb)v));
+    bag b;
+    if (!t || (!(b=table_find(t, where)))) {
+        prf("empty http eval result %d\n", t?table_elements(t):0);
+    } else {
+        edb_foreach_a((edb)b, e, sym(connection), v, m) {
+            prf("http eval result:\n %b\n", edb_dump(init, table_find(t, where)));
+            http_send_response(*h, b, e);
+            table_set(inputs, where, create_edb(init, 0));
         }
-    } else prf("result: empty\n");
+    }
 }
+
 
 // with the input/provides we can special case less of this
 static void run_eve_http_server(char *x)
@@ -85,6 +92,10 @@ static void run_eve_http_server(char *x)
 
 
     bag content = (bag)create_edb(init, 0);
+    // xxx - the use of the same attribute as a request is causing
+    // the spoopy orderer and the octopus-less compiler to do some
+    // really stupid things...turn off for debugging
+#if 0
     // linker sets?
     register(content, "/", "text/html", index);
     register(content, "/jssrc/renderer.js", "application/javascript", renderer);
@@ -93,14 +104,27 @@ static void run_eve_http_server(char *x)
     register(content, "/jssrc/codemirror.css", "text/css", codemirrorCss);
     register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
     build_bag(scopes, persisted, "content", content);
-
-
+#endif
+    // right now, the response is being persisted..to the event bag?
+    http_server *server = allocate(h, sizeof(http_server));
     evaluation ev = build_process(b, enable_tracing, scopes, persisted,
-                                  ignore, cont(h, handle_error_terminal));
+                                  cont(h, http_eval_result, server, persisted,
+                                       table_find(scopes, sym(event))),
+                                  cont(h, handle_error_terminal));
 
-    create_http_server(create_station(0, port), ev);
+    *server = create_http_server(create_station(0, port), ev);
 
     prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
+}
+
+static CONTINUATION_1_2(test_result, heap, multibag, multibag);
+static void test_result(heap h, multibag t, multibag f)
+{
+    if (f) {
+        table_foreach(f, n, v) {
+            prf("result: %v %b\n", n, edb_dump(h, (edb)v));
+        }
+    } else prf("result: empty\n");
 }
 
 static void run_test(bag root, buffer b, boolean tracing)
@@ -119,7 +143,9 @@ static void run_test(bag root, buffer b, boolean tracing)
                                   cont(h, test_result, h),
                                   cont(h, handle_error_terminal));
 
-    inject_event(ev, aprintf(h,"init!\n```\nbind\n      [#test-start]\n```"), tracing);
+    bag event = (bag)create_edb(init, 0);
+    apply(event->insert, generate_uuid(), sym(tag), sym(test-start), 1, 0);
+    inject_event(ev, event);
 }
 
 

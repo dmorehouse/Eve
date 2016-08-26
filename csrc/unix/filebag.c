@@ -140,6 +140,7 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
     if (sig & e_sig) {
         file f = table_find(fb->idmap, e);
         if (f) {
+            prf("filebag scan e %d %v %v %v\n", sig, e, a, v);
             struct stat st;
             int res = stat(path_of_file(f), &st);
             if (sig & a_sig) {
@@ -160,6 +161,7 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
         }
     } else {
         if ((sig == s_eAV) && (a == sym(tag)) && (v == sym(root))) {
+            prf("filebag returning root: %v\n", fb->root->u);
             apply(out, fb->root->u, a, v, 1, 0);
         }
         if ((sig == s_eAv) && (a ==sym(child))) {
