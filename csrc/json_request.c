@@ -4,17 +4,10 @@
 
 typedef struct json_session {
     heap h;
-    table current_session;
     table current_delta;
-    table persisted;
     buffer_handler write; // to weboscket
     uuid browser_uuid;
-    buffer graph;
-    table scopes;
     bag root, session;
-    boolean tracing;
-    evaluation ev;
-    heap eh;
 } *json_session;
 
 buffer format_error_json(heap h, char* message, bag data, uuid data_id);
@@ -86,7 +79,7 @@ static void send_diff(heap h, buffer_handler output, values_diff diff)
     apply(output, out, cont(h, send_destroy, h));
 }
 
-static CONTINUATION_1_3(send_response, json_session, multibag, multibag, table);
+static CONTINUATION_1_2(send_response, json_session, multibag, multibag);
 static void send_response(json_session session, multibag t_solution, multibag f_solution)
 {
     heap h = allocate_rolling(pages, sstring("response"));
@@ -117,20 +110,6 @@ static void send_response(json_session session, multibag t_solution, multibag f_
 
     destroy(session->current_delta->h);
     session->current_delta = results;
-}
-
-
-CONTINUATION_1_2(handle_json_query, json_session, bag, uuid);
-void handle_json_query(json_session session, bag in, uuid root)
-{
-    if (in == 0) {
-        close_evaluation(session->ev);
-        destroy(session->h);
-        return;
-    }
-
-    // in is going to take some deconstruction here, but you know....stuff
-    inject_event(session->ev, in);
 }
 
 void create_json_session(evaluation ev, buffer_handler w)

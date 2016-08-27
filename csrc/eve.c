@@ -73,8 +73,11 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
             http_send_response(*h, b, e);
             return;
         }
+        
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
-            http_upgrade(*h, b, e);
+            
+            // allocate json parser 
+            http_upgrade(*h, b, e, parse_json());
         }
     }
 }

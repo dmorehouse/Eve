@@ -49,7 +49,7 @@ void http_send_response(http_server s, bag b, uuid root)
 
         // xxx - if this doesn't correlate, we wont continue to read from
         // this connection
-        apply(reg, request_header_parser(s->h, cont(s->h, dispatch_request, hs)));
+        apply(hs->reg, request_header_parser(s->h, cont(s->h, dispatch_request, hs)));
     }
 }
 
@@ -84,7 +84,7 @@ buffer_handler http_ws_upgrade(http_server s, reader r, bag b, uuid root)
 {
     session hs = table_find(s->sessions, root);
 
-    return websocket_send_upgrade(hs->h, b, u,
+    return websocket_send_upgrade(hs->h, b, root,
                                   hs->write,
                                   r,
                                   hs->reg);
