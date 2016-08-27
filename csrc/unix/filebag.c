@@ -147,8 +147,8 @@ static void dump_tree(file f, listener out)
     }
 }
 
-CONTINUATION_1_5(filebag_scan, filebag, int, listener, value, value, value);
-void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
+static CONTINUATION_1_5(filebag_scan, filebag, int, listener, value, value, value);
+static void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
 {
     if (sig & e_sig) {
         file f = table_find(fb->idmap, e);
@@ -183,13 +183,13 @@ void filebag_scan(filebag fb, int sig, listener out, value e, value a, value v)
     // silently drop all inquries about free entities...we can filter on attribute, but value..man..
 }
 
-CONTINUATION_1_5(filebag_insert, filebag, value, value, value, multiplicity, uuid);
-void filebag_insert(filebag f, value e, value a, value v, multiplicity m, uuid bku)
+static CONTINUATION_1_5(filebag_insert, filebag, value, value, value, multiplicity, uuid);
+static void filebag_insert(filebag f, value e, value a, value v, multiplicity m, uuid bku)
 {
 }
 
-CONTINUATION_1_1(filebag_commit, filebag, edb)
-void filebag_commit(filebag fb, edb s)
+static CONTINUATION_1_1(filebag_commit, filebag, edb)
+static void filebag_commit(filebag fb, edb s)
 {
     edb_foreach_ev(s, e, sym(child), v, m) {
         file parent;

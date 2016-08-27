@@ -2,55 +2,65 @@
 
 // do we really need this? i mean eventually for reflection purposes
 typedef struct process {
+    heap h;
     evaluation ev;
+    table scopes;
+    table persisted;
 } *process;
 
 typedef struct process_bag{
-    table process_map;
-
+    struct bag b;
+    heap h;
+    table processes;
 } *process_bag;
 
-void start_process(table scopes)
+
+static CONTINUATION_1_5(process_bag_insert, process_bag, value, value, value, multiplicity, uuid);
+static void process_bag_insert(process_bag f, value e, value a, value v, multiplicity m, uuid bku)
 {
-    session->persisted = create_value_table(h);
-
-    table_set(session->persisted, session->root->u, session->root);
-    table_set(session->persisted, session->session->u, session->session);
-
-    session->scopes = create_value_table(session->h);
-    table_set(session->scopes, intern_cstring("session"), session->session->u);
-    table_set(session->scopes, intern_cstring("all"), session->root->u);
-    table_set(session->scopes, intern_cstring("browser"), session->browser_uuid);
-
 }
 
-CONTINUATION_1_1(process_bag_commit, filebag, edb)
-void process_bag_commit(filebag fb, edb s)
+static CONTINUATION_1_5(process_bag_scan, process_bag, int, listener, value, value, value);
+static void process_bag_scan(process_bag fb, int sig, listener out, value e, value a, value v)
 {
-    edb_foreach_a(s, e, sym(scope), v, m) {
+}
+
+CONTINUATION_1_1(process_bag_commit, process_bag, edb)
+void process_bag_commit(process_bag pb, edb s)
+{
+    edb_foreach_e(s, e, sym(tag), sym(process), v) {
+        heap h = allocate_rolling(pages, sstring("process"));
+        process p = allocate(h, sizeof(struct process));
+        p->h = h;
+        table_set(pb->processes, e, p);
+    }
+
+    edb_foreach_ev(s, e, sym(scope), v, m) {
 
     }
 
-    edb_foreach_a(s, e, sym(source), v, m) {
-        file parent;
-        if ((parent = table_find(fb->idmap, e))){
-            allocate_file(fb, parent, v);
+    edb_foreach_ev(s, e, sym(source), v, m) {
+        process p;
+        estring source = v;
+        if ((p = table_find(pb->processes, e))){
+            evaluation ev = build_process(p->h,
+                                          wrap_buffer(p->h, source->body, source->length),
+                                          false, p->scopes, p->persisted,
+                                          ignore, ignore);
         }
     }
 }
 
 
 // not sure if bag is the right model for presenting this interface, but it can be changed
-bag process_bag_init(buffer root_pathname, uuid root)
+bag process_bag_init()
 {
     heap h = allocate_rolling(init, sstring("process_bag"));
     process_bag pb = allocate(h, sizeof(struct process_bag));
     pb->h = h;
     pb->b.insert = cont(h, process_bag_insert, pb);
     pb->b.scan = cont(h, process_bag_scan, pb);
-    pb->b.u = generate_uuid();
     pb->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
-    pb->b.implications = allocate_table(h, key_from_pointer, compare_pointer);
     pb->b.commit = cont(h, process_bag_commit, pb);
     return (bag)pb;
 }

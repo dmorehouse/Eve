@@ -7,7 +7,7 @@ LUAJIT_INCLUDES = $(LUAJIT_INSTALL)/include/luajit-2.1
 BUILD = $(CURDIR)
 
 #find a better way to do this
-.SECONDARY: ../build/client.js ../build/editor.js ../build/renderer.js ../build/util.js
+.SECONDARY: ../build/client.js ../build/editor.js ../build/renderer.js ../build/gutil.js
 
 PLATFORM = $(shell uname)
 
@@ -47,7 +47,7 @@ UNIX_H = unix_internal.h unix.h
 CORE = buffer.o table.o vector.o format.o rolling.o string.o pqueue.o timer.o field.o
 CORE_H = bswap.h pqueue.h vector.h buffer.h heap.h timer.h continuation.h core.h string.h table.h
 EXEC = exec_expression.o exec_edb.o exec_string.o exec_aggregate.o exec.o
-RUNTIME = edb.o init.o uuid.o estring.o types.o luanne.o json_request.o runner.o request.o path.o $(EXEC)
+RUNTIME = edb.o init.o uuid.o estring.o types.o luanne.o json_request.o runner.o request.o path.o process_bag.o bag_bag.o $(EXEC)
 RUNTIME_H = luanne.h runtime.h estring.h number.h types.h exec.h edb.h json_request.h
 HTTP = server.o websocket.o base64.o sha1.o json.o client.o http.o hmac_sha2.o sha256.o
 DNS = dns.o

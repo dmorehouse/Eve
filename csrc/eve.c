@@ -66,7 +66,7 @@ static void http_eval_result(http_server *h, table inputs, uuid where, multibag 
 {
     bag b;
     if (!f || (!(b=table_find(f, where)))) {
-        prf("empty http eval result %d\n", t?table_elements(f):0);
+        prf("empty http eval result %d\n", f?table_elements(f):0);
     } else {
         edb_foreach_ev((edb)b, e, sym(response), response, m){
             // xxx we're using e as a very weak correlator to the connection
@@ -89,7 +89,9 @@ static void run_eve_http_server(char *x)
     // maybe?
     build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
+    // xxx - these two probably shouldn't be part of the default scope..but hey
     build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
+    build_bag(scopes, persisted, "process", (bag)process_bag_init());
 
     bag content = (bag)create_edb(init, 0);
     // xxx - the use of the same attribute as a request is causing
@@ -121,7 +123,8 @@ static void run_eve_http_server(char *x)
 #endif
     // right now, the response is being persisted..to the event bag?
     http_server *server = allocate(h, sizeof(http_server));
-    evaluation ev = build_process(b, enable_tracing, scopes, persisted,
+    heap hc = allocate_rolling(pages, sstring("eval"));
+    evaluation ev = build_process(hc, b, enable_tracing, scopes, persisted,
                                   cont(h, http_eval_result, server, persisted,
                                        table_find(scopes, sym(session))),
                                   cont(h, handle_error_terminal));
@@ -153,12 +156,12 @@ static void run_test(bag root, buffer b, boolean tracing)
     build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
-
-    evaluation ev = build_process(b, tracing, scopes, persisted,
+    heap ht = allocate_rolling(pages, sstring("eval"));
+    evaluation ev = build_process(ht, b, tracing, scopes, persisted,
                                   cont(h, test_result, h),
                                   cont(h, handle_error_terminal));
 
-    bag event = (bag)create_edb(init, 0);
+    bag event = (bag)create_edb(ht, 0);
     apply(event->insert, generate_uuid(), sym(tag), sym(test-start), 1, 0);
     inject_event(ev, event);
 }

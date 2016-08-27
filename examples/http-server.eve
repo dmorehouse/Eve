@@ -72,11 +72,11 @@ start eve program
      [#request-object extension:"eve" file]
   commit
      // build an environment for the new process
-//     child = [#process source: file.contents]
+     child = [#process source: file.contents]
   bind
      r.finished := true
      // upgrade, protocol, json and process bind is kinda hardwired for now
-//     r.upgrade := child
+     r.upgrade := child
 ```
 
 no such file!
