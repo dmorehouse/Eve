@@ -7,7 +7,7 @@ LUAJIT_INCLUDES = $(LUAJIT_INSTALL)/include/luajit-2.1
 BUILD = $(CURDIR)
 
 #find a better way to do this
-.SECONDARY: ../build/client.js ../build/editor.js ../build/renderer.js ../build/gutil.js
+.SECONDARY: ../build/client.js ../build/editor.js ../build/renderer.js ../build/util.js
 
 PLATFORM = $(shell uname)
 

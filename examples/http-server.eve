@@ -70,7 +70,7 @@ start eve program
   match
      r = [#http-request request:[headers: [Sec-WebSocket-Protocol]]]
      [#request-object extension:"eve" file]
-  commit
+  commit @process
      // build an environment for the new process
      child = [#process source: file.contents]
   bind

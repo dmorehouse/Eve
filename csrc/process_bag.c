@@ -31,6 +31,8 @@ void process_bag_commit(process_bag pb, edb s)
     edb_foreach_e(s, e, sym(tag), sym(process), v) {
         heap h = allocate_rolling(pages, sstring("process"));
         process p = allocate(h, sizeof(struct process));
+        p->scopes = create_value_table(h);
+        p->persisted = create_value_table(h);
         p->h = h;
         table_set(pb->processes, e, p);
     }
@@ -62,5 +64,6 @@ bag process_bag_init()
     pb->b.scan = cont(h, process_bag_scan, pb);
     pb->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
     pb->b.commit = cont(h, process_bag_commit, pb);
+    pb->processes = create_value_table(h);
     return (bag)pb;
 }
