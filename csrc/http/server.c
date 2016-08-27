@@ -1,5 +1,4 @@
 #include <runtime.h>
-#include <json_request.h>
 #include <http/http.h>
 // rfc 2616
 
@@ -8,6 +7,7 @@ struct http_server {
     evaluation ev;
     table sessions;
 };
+
 typedef struct session {
     bag b;
     heap h;
@@ -15,7 +15,10 @@ typedef struct session {
     http_server parent;
     buffer_handler write;
     evaluation ev;
+    register_read reg;
 } *session;
+
+static CONTINUATION_1_3(dispatch_request, session, bag, uuid, register_read);
 
 void http_send_response(http_server s, bag b, uuid root)
 {
@@ -43,10 +46,14 @@ void http_send_response(http_server s, bag b, uuid root)
             buffer b = wrap_buffer(hs->h, body->body, body->length);
             apply(hs->write, b, ignore);
         }
+
+        // xxx - if this doesn't correlate, we wont continue to read from
+        // this connection
+        apply(reg, request_header_parser(s->h, cont(s->h, dispatch_request, hs)));
     }
 }
 
-static CONTINUATION_1_3(dispatch_request, session, bag, uuid, register_read);
+
 static void dispatch_request(session s, bag b, uuid i, register_read reg)
 {
     buffer *c;
@@ -69,8 +76,18 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
     apply(event->insert, x, sym(request), i, 1, 0);
     apply(event->insert, x, sym(connection), s->self, 1, 0);
     inject_event(s->parent->ev,event);
+    s->reg = reg;
+}
 
-    apply(reg, request_header_parser(s->h, cont(s->h, dispatch_request, s)));
+// request bag and root
+buffer_handler http_ws_upgrade(http_server s, reader r, bag b, uuid root)
+{
+    session hs = table_find(s->sessions, root);
+
+    return websocket_send_upgrade(hs->h, b, u,
+                                  hs->write,
+                                  r,
+                                  hs->reg);
 }
 
 CONTINUATION_1_3(new_connection, http_server, buffer_handler, station, register_read);

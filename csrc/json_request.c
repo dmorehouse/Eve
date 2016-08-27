@@ -1,7 +1,23 @@
 #include <runtime.h>
-#include <json_request.h>
 #include <http/http.h>
 #include <luanne.h>
+
+typedef struct json_session {
+    heap h;
+    table current_session;
+    table current_delta;
+    table persisted;
+    buffer_handler write; // to weboscket
+    uuid browser_uuid;
+    buffer graph;
+    table scopes;
+    bag root, session;
+    boolean tracing;
+    evaluation ev;
+    heap eh;
+} *json_session;
+
+buffer format_error_json(heap h, char* message, bag data, uuid data_id);
 
 static CONTINUATION_1_0(send_destroy, heap);
 static void send_destroy(heap h)
@@ -70,9 +86,8 @@ static void send_diff(heap h, buffer_handler output, values_diff diff)
     apply(output, out, cont(h, send_destroy, h));
 }
 
-// solution should already contain the diffs against persisted...except missing support (diane)
 static CONTINUATION_1_3(send_response, json_session, multibag, multibag, table);
-static void send_response(json_session session, multibag t_solution, multibag f_solution, table counters)
+static void send_response(json_session session, multibag t_solution, multibag f_solution)
 {
     heap h = allocate_rolling(pages, sstring("response"));
     heap p = allocate_rolling(pages, sstring("response delta"));
@@ -104,20 +119,6 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     session->current_delta = results;
 }
 
-// this should be a reflection
-void send_parse(json_session session, buffer query)
-{
-    heap h = allocate_rolling(pages, sstring("parse response"));
-    string out = allocate_string(h);
-    interpreter lua = get_lua();
-    value json = lua_run_module_func(lua, query, "parser", "parseJSON");
-    estring json_estring = json;
-    buffer_append(out, json_estring->body, json_estring->length);
-    free_lua(lua);
-    // send the json message
-    apply(session->write, out, cont(h, send_destroy, h));
-}
-
 
 CONTINUATION_1_2(handle_json_query, json_session, bag, uuid);
 void handle_json_query(json_session session, bag in, uuid root)
@@ -132,28 +133,7 @@ void handle_json_query(json_session session, bag in, uuid root)
     inject_event(session->ev, in);
 }
 
-
-void new_json_session(evaluation ev,
-                      buffer_handler write,
-                      bag b,
-                      uuid u,
-                      register_read reg)
+void create_json_session(evaluation ev, buffer_handler w)
 {
-    heap h = allocate_rolling(pages, sstring("session"));
-    uuid su = generate_uuid();
-
-    json_session session = allocate(h, sizeof(struct json_session));
-    session->graph = 0; // @FIXME: remove this completely
-    session->h = h;
-    session->session = (bag)create_edb(h, 0);
-    session->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("trash")));
-    session->browser_uuid = generate_uuid();
-    session->eh = allocate_rolling(pages, sstring("eval"));
-
-
-    session->write = websocket_send_upgrade(session->eh, b, u,
-                                      write,
-                                      parse_json(session->eh, cont(h, handle_json_query, session)),
-                                      reg);
 
 }

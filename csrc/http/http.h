@@ -51,3 +51,4 @@ void http_send_header(buffer_handler w, bag b, uuid n, value first, value second
 buffer_handler websocket_client(heap h, bag request, uuid rid, reader up);
 
 buffer json_encode(heap, bag b, uuid n);
+void http_upgrade(http_server, evaluation, bag, uuid);

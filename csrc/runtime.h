@@ -193,4 +193,5 @@ static evaluation build_process(heap h,
     return build_evaluation(h, scopes, inputs, r, e, n);
 }
 
-bag process_bag_init();
+typedef struct process_bag *process_bag;
+process_bag process_bag_init();

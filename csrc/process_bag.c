@@ -8,11 +8,11 @@ typedef struct process {
     table persisted;
 } *process;
 
-typedef struct process_bag{
+struct process_bag{
     struct bag b;
     heap h;
     table processes;
-} *process_bag;
+};
 
 
 static CONTINUATION_1_5(process_bag_insert, process_bag, value, value, value, multiplicity, uuid);
@@ -55,7 +55,7 @@ void process_bag_commit(process_bag pb, edb s)
 
 
 // not sure if bag is the right model for presenting this interface, but it can be changed
-bag process_bag_init()
+process_bag process_bag_init()
 {
     heap h = allocate_rolling(init, sstring("process_bag"));
     process_bag pb = allocate(h, sizeof(struct process_bag));
@@ -65,5 +65,5 @@ bag process_bag_init()
     pb->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
     pb->b.commit = cont(h, process_bag_commit, pb);
     pb->processes = create_value_table(h);
-    return (bag)pb;
+    return pb;
 }

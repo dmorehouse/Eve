@@ -61,8 +61,8 @@ static void handle_error_terminal(char * message, bag data, uuid data_id) {
 
 
 
-static CONTINUATION_3_2(http_eval_result, http_server *, table, uuid, multibag, multibag);
-static void http_eval_result(http_server *h, table inputs, uuid where, multibag t, multibag f)
+static CONTINUATION_4_2(http_eval_result, http_server *, table, process_bag, uuid, multibag, multibag);
+static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid where, multibag t, multibag f)
 {
     bag b;
     if (!f || (!(b=table_find(f, where)))) {
@@ -73,27 +73,14 @@ static void http_eval_result(http_server *h, table inputs, uuid where, multibag 
             http_send_response(*h, b, e);
             return;
         }
+        edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
+            http_upgrade(*h, b, e);
+        }
     }
 }
 
 
-// with the input/provides we can special case less of this
-static void run_eve_http_server(char *x)
-{
-    buffer b = read_file_or_exit(init, x);
-    heap h = allocate_rolling(pages, sstring("command line"));
-    table scopes = create_value_table(h);
-    table persisted = create_value_table(h);
-    build_bag(scopes, persisted, "all", (bag)create_edb(h, 0));
-    build_bag(scopes, persisted, "session", (bag)create_edb(h, 0));
-    // maybe?
-    build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
-    build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
-    // xxx - these two probably shouldn't be part of the default scope..but hey
-    build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
-    build_bag(scopes, persisted, "process", (bag)process_bag_init());
 
-    bag content = (bag)create_edb(init, 0);
     // xxx - the use of the same attribute as a request is causing
     // the spoopy orderer and the octopus-less compiler to do some
     // really stupid things...turn off for debugging
@@ -121,11 +108,32 @@ static void run_eve_http_server(char *x)
     register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
     build_bag(scopes, persisted, "content", content);
 #endif
+
+
+// with the input/provides we can special case less of this
+static void run_eve_http_server(char *x)
+{
+    buffer b = read_file_or_exit(init, x);
+    heap h = allocate_rolling(pages, sstring("command line"));
+    table scopes = create_value_table(h);
+    table persisted = create_value_table(h);
+    build_bag(scopes, persisted, "all", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "session", (bag)create_edb(h, 0));
+    // maybe?
+    build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
+    build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
+    // xxx - these two probably shouldn't be part of the default scope..but hey
+    build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
+    process_bag pb  = process_bag_init();
+    build_bag(scopes, persisted, "process", (bag)pb);
+
+    bag content = (bag)create_edb(init, 0);
+
     // right now, the response is being persisted..to the event bag?
     http_server *server = allocate(h, sizeof(http_server));
     heap hc = allocate_rolling(pages, sstring("eval"));
     evaluation ev = build_process(hc, b, enable_tracing, scopes, persisted,
-                                  cont(h, http_eval_result, server, persisted,
+                                  cont(h, http_eval_result, server, persisted, pb,
                                        table_find(scopes, sym(session))),
                                   cont(h, handle_error_terminal));
 
