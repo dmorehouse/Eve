@@ -53,7 +53,7 @@ complete! send content response
 initiate eve program
 ```
   match
-     r = [#http-request]
+     r = [#http-request request:[headers: [not(Sec-WebSocket-Protocol)]]]
      [#request-object extension:"eve" file]
      [#root child:[name:"index.html" contents]]
   bind
@@ -68,18 +68,15 @@ initiate eve program
 start eve program
 ```
   match
-     r = [#http-request header:[zikky]]
+     r = [#http-request request:[headers: [Sec-WebSocket-Protocol]]]
      [#request-object extension:"eve" file]
+  commit
+     // build an environment for the new process
+//     child = [#process source: file.contents]
   bind
-     // ok, here we need to
-        // build an environment for the new process
-        // start the new process
-       // upgrade the socket to the websocket
      r.finished := true
-     r.response := [body: file.body
-       status:"200"
-       reason:"OK"
-       header:[Content-Type:ct.type]]
+     // upgrade, protocol, json and process bind is kinda hardwired for now
+//     r.upgrade := child
 ```
 
 no such file!

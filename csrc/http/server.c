@@ -61,7 +61,6 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
 
     bag event = (bag)create_edb(s->h, build_vector(s->h, b));
     uuid x = generate_uuid();
-    prf("starting http request: %v\n", x);
 
     // sadness
     table_set(s->parent->sessions, x, s);
