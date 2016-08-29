@@ -73,11 +73,15 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
             http_send_response(*h, b, e);
             return;
         }
-        
+
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
+            heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev; // wire in from child
-            // allocate json parser 
-            http_ws_upgrade(*h, b, e, parse_json(http->reg));
+            // allocate json parser
+            endpoint e = http_ws_upgrade(*h, e, b, e);
+            // not using the write path here
+            // browser sessinon
+            parse_json(jh, e, create_json_session(jh, ev, 0));
         }
     }
 }
@@ -208,20 +212,6 @@ static void end_read(reader r)
     apply(r, 0, 0);
 }
 
-static CONTINUATION_0_2(dumpo, bag, uuid);
-static void dumpo(bag b, uuid u)
-{
-    if (b) prf("%b", edb_dump(init, (edb)b));
-}
-
-// should actually merge into bag
-static void do_json(char *x)
-{
-    buffer f = read_file_or_exit(init, x);
-    reader r = parse_json(init, cont(init, dumpo));
-    apply(r, f, cont(init, end_read));
-}
-
 static command commands;
 
 static void print_help(char *x);
@@ -234,7 +224,6 @@ static struct command command_body[] = {
     {"s", "serve", "use the subsequent eve file to serve http requests", true, run_eve_http_server},
     {"P", "port", "serve http on passed port", true, do_port},
     {"h", "help", "print help", false, print_help},
-    {"j", "json", "source json object from file", true, do_json},
     {"t", "tracing", "enable per-statement tracing", false, do_tracing},
     //    {"R", "resolve", "implication resolver", false, 0},
 };

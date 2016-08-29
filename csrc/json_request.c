@@ -6,7 +6,6 @@ typedef struct json_session {
     heap h;
     table current_delta;
     uuid u;
-    reader self;
     evaluation ev;
     endpoint down;
 } *json_session;
@@ -62,7 +61,7 @@ static CONTINUATION_1_3(handle_error, json_session, char *, bag, uuid);
 static void handle_error(json_session session, char * message, bag data, uuid data_id) {
     heap h = allocate_rolling(pages, sstring("error handler"));
     buffer out = format_error_json(h, message, data, data_id);
-    apply(session->write, out, cont(h, send_destroy, h));
+    apply(session->down->w, out, cont(h, send_destroy, h));
 }
 
 
@@ -107,7 +106,7 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     }
 
 
-    send_diff(h, session->write, diff);
+    send_diff(h, session->down->w, diff);
 
     destroy(session->current_delta->h);
     session->current_delta = results;
@@ -119,16 +118,12 @@ static void json_input(json_session s, bag b, uuid x)
     // uhh, guys?
 }
 
-void create_json_session(heap h, evaluation ev, uuid u, endpoint e)
+object_handler create_json_session(heap h, evaluation ev, uuid u)
 {
     // allocate json parser
     json_session s = allocate(h, sizeof(struct json_session));
     s->h = h;
     s->ev = ev;
     s->u = u;
-    s->down = e;
-    s->self = cont(h, json_input, s);
-    parse_json(heap h, endpoint e, object_handler j);
-    apply(e->r, self);
+    return(cont(h, json_input, s));
 }
-

@@ -32,7 +32,6 @@ endpoint websocket_send_upgrade(heap h,
 typedef closure(http_service, buffer_handler, bag, uuid, register_read);
 void http_register_service(http_server, http_service, string);
 // this has no backpressure
-typedef closure(object_handler, bag, uuid);
 object_handler parse_json(heap h, endpoint e, object_handler j);
 void print_value_json(buffer out, value v);
 void print_value_vector_json(buffer out, vector vec);
@@ -50,4 +49,3 @@ endpoint websocket_client(heap h, bag request, uuid rid);
 
 buffer json_encode(heap, bag b, uuid n);
 endpoint http_ws_upgrade(http_server s, endpoint e, bag b, uuid root);
-
