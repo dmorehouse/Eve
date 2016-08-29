@@ -5,9 +5,10 @@
 typedef struct json_session {
     heap h;
     table current_delta;
-    buffer_handler write; // to weboscket
-    uuid browser_uuid;
-    bag root, session;
+    uuid u;
+    reader self;
+    evaluation ev;
+    endpoint down;
 } *json_session;
 
 buffer format_error_json(heap h, char* message, bag data, uuid data_id);
@@ -87,7 +88,7 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     table results = create_value_vector_table(p);
     edb browser;
 
-    if (f_solution && (browser = table_find(f_solution, session->browser_uuid))) {
+    if (f_solution && (browser = table_find(f_solution, session->u))) {
         edb_foreach(browser, e, a, v, c, _)
             table_set(results, build_vector(p, e, a, v), etrue);
     }
@@ -96,7 +97,7 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     values_diff diff = diff_value_vector_tables(p, session->current_delta, results);
     // destructs h
 
-    if (t_solution && (browser = table_find(t_solution, session->browser_uuid))) {
+    if (t_solution && (browser = table_find(t_solution, session->u))) {
         edb_foreach(browser, e, a, v, m, u) {
             if (m > 0)
                 vector_insert(diff->insert, build_vector(h, e, a, v));
@@ -112,7 +113,22 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     session->current_delta = results;
 }
 
-void create_json_session(evaluation ev, buffer_handler w)
+static CONTINUATION_1_2(json_input, json_session, bag, uuid);
+static void json_input(json_session s, bag b, uuid x)
 {
-
+    // uhh, guys?
 }
+
+void create_json_session(heap h, evaluation ev, uuid u, endpoint e)
+{
+    // allocate json parser
+    json_session s = allocate(h, sizeof(struct json_session));
+    s->h = h;
+    s->ev = ev;
+    s->u = u;
+    s->down = e;
+    s->self = cont(h, json_input, s);
+    parse_json(heap h, endpoint e, object_handler j);
+    apply(e->r, self);
+}
+

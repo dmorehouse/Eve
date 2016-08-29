@@ -13,9 +13,8 @@ typedef struct session {
     heap h;
     uuid self;
     http_server parent;
-    buffer_handler write;
     evaluation ev;
-    register_read reg;
+    endpoint e;
 } *session;
 
 static CONTINUATION_1_3(dispatch_request, session, bag, uuid, register_read);
@@ -37,19 +36,19 @@ void http_send_response(http_server s, bag b, uuid root)
             apply(shadow->insert, header, sym(Content-Length), box_float(body->length), 1, 0);
         }
 
-        http_send_header(hs->write, shadow, header,
+        http_send_header(hs->e->w, shadow, header,
                          sym(HTTP/1.1),
                          lookupv((edb)shadow, response, sym(status)),
                          lookupv((edb)shadow, response, sym(reason)));
         if (body) {
             // xxx - leak the wrapper
             buffer b = wrap_buffer(hs->h, body->body, body->length);
-            apply(hs->write, b, ignore);
+            apply(hs->e->w, b, ignore);
         }
 
         // xxx - if this doesn't correlate, we wont continue to read from
         // this connection
-        apply(hs->reg, request_header_parser(s->h, cont(s->h, dispatch_request, hs)));
+        apply(hs->e->r, request_header_parser(s->h, cont(s->h, dispatch_request, hs)));
     }
 }
 
@@ -76,37 +75,33 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
     apply(event->insert, x, sym(request), i, 1, 0);
     apply(event->insert, x, sym(connection), s->self, 1, 0);
     inject_event(s->parent->ev,event);
-    s->reg = reg;
+    s->e->r = reg;
 }
 
-// request bag and root
-buffer_handler http_ws_upgrade(http_server s, reader r, bag b, uuid root)
+
+endpoint http_ws_upgrade(http_server s, endpoint e, bag b, uuid root)
 {
     session hs = table_find(s->sessions, root);
 
-    return websocket_send_upgrade(hs->h, b, root,
-                                  hs->write,
-                                  r,
-                                  hs->reg);
+    return websocket_send_upgrade(hs->h, hs->e, b, root);
 }
 
-CONTINUATION_1_3(new_connection, http_server, buffer_handler, station, register_read);
+CONTINUATION_1_2(new_connection, http_server, endpoint, station);
 void new_connection(http_server s,
-                    buffer_handler write,
-                    station peer,
-                    register_read reg)
+                    endpoint e,
+                    station peer)
 {
     heap h = allocate_rolling(pages, sstring("connection"));
     session hs = allocate(h, sizeof(struct session));
-    hs->write = write;
     hs->parent = s;
     hs->h = h;
+    hs->e = e;
     hs->self = generate_uuid();
     table_set(s->sessions, hs->self, hs);
 
     // as it stands, no one really cares about new connects arriving,
     // but it seems at minumum we might want to log and keep track
-    apply(reg, request_header_parser(h, cont(h, dispatch_request, hs)));
+    apply(e->r, request_header_parser(h, cont(h, dispatch_request, hs)));
 }
 
 

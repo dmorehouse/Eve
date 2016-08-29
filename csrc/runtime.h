@@ -195,3 +195,4 @@ static evaluation build_process(heap h,
 
 typedef struct process_bag *process_bag;
 process_bag process_bag_init();
+void create_json_session(heap h, evaluation ev, uuid u, endpoint e);

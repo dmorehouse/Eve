@@ -75,42 +75,30 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
         }
         
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
-            
+            evaluation ev; // wire in from child
             // allocate json parser 
-            http_upgrade(*h, b, e, parse_json());
+            http_ws_upgrade(*h, b, e, parse_json(http->reg));
         }
     }
 }
 
 
-
-    // xxx - the use of the same attribute as a request is causing
-    // the spoopy orderer and the octopus-less compiler to do some
-    // really stupid things...turn off for debugging
-#if 0
-    register(h, "/", "text/html", index);
-    register(h, "/js/microReact.js", "application/javascript", microReact_js);
-    register(h, "/js/codemirror.js", "application/javascript", codemirror_js);
-    register(h, "/js/codemirror.css", "text/css", codemirror_css);
-    register(h, "/examples/todomvc.css", "text/css", todomvc_css);
-    register(h, "/js/commonmark.js", "application/javascript", commonmark_js);
-    register(h, "/js/system.js", "application/javascript", system_js);
-
-    register(h, "/js/util.js", "application/javascript", util_js);
-    register(h, "/js/client.js", "application/javascript", client_js);
-    register(h, "/js/renderer.js", "application/javascript", renderer_js);
-    register(h, "/js/editor.js", "application/javascript", editor_js);
-
-
-    // linker sets?
-    register(content, "/", "text/html", index);
-    register(content, "/jssrc/renderer.js", "application/javascript", renderer);
-    register(content, "/jssrc/microReact.js", "application/javascript", microReact);
-    register(content, "/jssrc/codemirror.js", "application/javascript", codemirror);
-    register(content, "/jssrc/codemirror.css", "text/css", codemirrorCss);
-    register(content, "/examples/todomvc.css", "text/css", exampleTodomvcCss);
-    build_bag(scopes, persisted, "content", content);
-#endif
+static bag static_content(heap h)
+{
+    bag b = (bag)create_edb(h, 0);
+    register(b, "/", "text/html", index);
+    register(b, "/js/microReact.js", "application/javascript", microReact_js);
+    register(b, "/js/codemirror.js", "application/javascript", codemirror_js);
+    register(b, "/js/codemirror.css", "text/css", codemirror_css);
+    register(b, "/examples/todomvc.css", "text/css", todomvc_css);
+    register(b, "/js/commonmark.js", "application/javascript", commonmark_js);
+    register(b, "/js/system.js", "application/javascript", system_js);
+    register(b, "/js/util.js", "application/javascript", util_js);
+    register(b, "/js/client.js", "application/javascript", client_js);
+    register(b, "/js/renderer.js", "application/javascript", renderer_js);
+    register(b, "/js/editor.js", "application/javascript", editor_js);
+    return b;
+}
 
 
 // with the input/provides we can special case less of this

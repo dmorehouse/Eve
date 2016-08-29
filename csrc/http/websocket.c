@@ -6,10 +6,10 @@ extern thunk ignore;
 
 typedef struct websocket {
     heap h;
-    heap buffer_heap;
     buffer reassembly;
+    endpoint down;
     reader client;
-    buffer_handler write;
+    struct endpoint up;
     timer keepalive;
     reader self;
     u32 output_mask;
@@ -42,8 +42,8 @@ void websocket_send(websocket w, int opcode, buffer b, thunk t)
             buffer_write_byte(out, length);
         }
     }
-    apply(w->write, out, ignore); // reclaim
-    apply(w->write, b, t);
+    apply(w->down->w, out, ignore); // reclaim
+    apply(w->down->w, b, t);
 }
 
 
@@ -144,18 +144,17 @@ static void websocket_input_frame(websocket w, buffer b, register_read reg)
     }
  end:
     // i think we're responsible for freeing this buffer
-    apply(reg, w->self);
+    apply(w->down->r, w->self);
 }
 
 void sha1(buffer d, buffer s);
 
-websocket new_websocket(heap h, reader up)
+websocket new_websocket(heap h)
 {
     websocket w = allocate(h, sizeof(struct websocket));
     w->reassembly = allocate_buffer(h, 1000);
     w->h = h;
     w->output_mask = 0;
-    w->client = up;
     w->self = cont(h, websocket_input_frame, w);
     return w;
 }
@@ -171,10 +170,10 @@ static void header_response(websocket w, bag b, uuid n, register_read r)
 }
 
 
-static CONTINUATION_3_2(client_connected, websocket, bag, uuid,
-                        buffer_handler, register_read);
+static CONTINUATION_3_1(client_connected, websocket, bag, uuid,
+                        endpoint)
 static void client_connected(websocket w, bag request, uuid rid,
-                             buffer_handler wr, register_read r)
+                             endpoint down)
 {
 
     bag shadow = (bag)create_edb(w->h, build_vector(w->h, request));
@@ -186,34 +185,30 @@ static void client_connected(websocket w, bag request, uuid rid,
     // if they really wanted to...they..could handle this part as well
     apply(shadow->insert, header, sym(Sec-WebSocket-Key), sym(dGhlIHNhbXBsZSBub25jZQ), 1, 0); /*bku*/
     apply(shadow->insert, header, sym(Upgrade), sym(websocket), 1, 0);
-    http_send_request(wr, shadow, rid);
-    w->write = wr;
-    apply(r, response_header_parser(w->h, cont(w->h, header_response, w)));
+    http_send_request(down->w, shadow, rid);
+    w->down = down;
+    apply(w->down->r, response_header_parser(w->h, cont(w->h, header_response, w)));
 }
 
-// xxx - we're returning the write function before we're able to accept input on it
-buffer_handler websocket_client(heap h,
-                                bag request,
-                                uuid rid,
-                                reader up)
+endpoint websocket_client(heap h,
+                          bag request,
+                          uuid rid)
 {
-    websocket w = new_websocket(h, up);
+    websocket w = new_websocket(h);
     estring host = lookupv((edb)request, rid, sym(host));
     tcp_create_client (h,
                        station_from_string(h, alloca_wrap_buffer(host->body, host->length)),
                        cont(h, client_connected, w, request, rid));
-    return(cont(h, websocket_output_frame, w));
+    return(&w->up);
 }
 
 
-buffer_handler websocket_send_upgrade(heap h,
-                                      bag b,
-                                      uuid n,
-                                      buffer_handler down,
-                                      buffer_handler up,
-                                      register_read reg)
+endpoint websocket_send_upgrade(heap h,
+                                endpoint down,
+                                bag b,
+                                uuid n)
 {
-    websocket w = new_websocket(h, up);
+    websocket w = new_websocket(h);
     estring ekey;
     string key;
 
@@ -237,8 +232,9 @@ buffer_handler websocket_send_upgrade(heap h,
     outline(upgrade, "");
 
     register_periodic_timer(seconds(5), cont(w->h, send_keepalive, w, allocate_buffer(w->h, 0)));
-    w->write = down;
-    apply(w->write, upgrade, ignore);
-    apply(reg, w->self);
-    return(cont(h, websocket_output_frame, w));
+    w->down = down;
+    apply(w->down->w, upgrade, ignore);
+    apply(w->down->r, w->self);
+    w->up.w = cont(h, websocket_output_frame, w);
+    return &w->up;
 }

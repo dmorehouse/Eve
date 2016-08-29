@@ -23,19 +23,17 @@ void register_static_content(http_server h, char *url, char *content_type, buffe
 // siganture for more standard request/response guys
 typedef closure(http_handler, bag, uuid, register_read);
 
-buffer_handler websocket_send_upgrade(heap h,
-                                      bag b,
-                                      uuid n,
-                                      buffer_handler down,
-                                      buffer_handler up,
-                                      register_read reg);
+endpoint websocket_send_upgrade(heap h,
+                                endpoint down,
+                                bag b,
+                                uuid n);
 
 // should be asynch...but you know
 typedef closure(http_service, buffer_handler, bag, uuid, register_read);
 void http_register_service(http_server, http_service, string);
 // this has no backpressure
-typedef closure(json_handler, bag, uuid);
-reader parse_json(heap h, json_handler j);
+typedef closure(object_handler, bag, uuid);
+object_handler parse_json(heap h, endpoint e, object_handler j);
 void print_value_json(buffer out, value v);
 void print_value_vector_json(buffer out, vector vec);
 void escape_json(buffer out, string current);
@@ -48,7 +46,8 @@ client open_http_client(heap h, bag s, uuid request, http_handler response);
 
 void http_send_header(buffer_handler w, bag b, uuid n, value first, value second, value third);
 
-buffer_handler websocket_client(heap h, bag request, uuid rid, reader up);
+endpoint websocket_client(heap h, bag request, uuid rid);
 
 buffer json_encode(heap, bag b, uuid n);
-void http_upgrade(http_server, evaluation, bag, uuid);
+endpoint http_ws_upgrade(http_server s, endpoint e, bag b, uuid root);
+
