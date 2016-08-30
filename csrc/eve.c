@@ -65,6 +65,7 @@ static CONTINUATION_4_2(http_eval_result, http_server *, table, process_bag, uui
 static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid where, multibag t, multibag f)
 {
     bag b;
+    prf ("http eval result: %v\n", where);
     if (!f || (!(b=table_find(f, where)))) {
         prf("empty http eval result %d\n", f?table_elements(f):0);
     } else {
@@ -75,6 +76,7 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
         }
 
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
+            prf("upgrade\n");
             heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev = process_resolve(pb, child);
             // allocate json parser

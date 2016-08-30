@@ -26,68 +26,74 @@ bind
 path search complete
 ```
 match
+     connection = [#http-request]
      [#path index token]
      final = [#path index: count[given: index] file]
      split[text:final.token by:"." token:extoken index:exindex]
      exindex = 2
-bind
-     [#request-object extension:extoken token: final.token file]
+commit
+     [#request-object extension: extoken connection token: final.token file]
 ```
+
 
 complete! send content response
 ```
   match
-     r = [#http-request]
-     [#request-object extension file]
+     r = [#request-object extension file connection]
      ct = [#content-type suffix:extension]
-  bind
-     r.finished := true
-     r.response := [
+  commit
+    connection.response := [
        content: file.contents
        status:"200"
        reason:"OK"
        header:[Content-Type:ct.type]]
+    r := none
+  bind r.completed := true
 ```
 
 
 initiate eve program
 ```
   match
-     r = [#http-request request:[headers: [not(Sec-WebSocket-Protocol)]]]
-     [#request-object extension:"eve" file]
+     r = [#request-object connection connection:[request:[headers: [not(Sec-WebSocket-Protocol)]]]
+                          extension:"eve" file]
      [#root child:[name:"index.html" contents]]
-  bind
-     r.finished := true
-     r.response := [content: contents
+  commit
+     connection.response := [
+       content: contents
        status:"200"
        reason:"OK"
        header:[Content-Type:"text/html"]]
+     r := none
+  bind r.completed := true
 ```
 
 
 start eve program
 ```
   match
-     r = [#http-request request:[headers: [Sec-WebSocket-Protocol]]]
+     r = [#request-object request:[headers: [Sec-WebSocket-Protocol]]]
      [#request-object extension:"eve" file]
   commit @process
      // build an environment for the new process
      child = [#process source: file.contents]
+  commit
+     connection.upgrade := child
+     r := none
   bind
-     r.finished := true
-     // upgrade, protocol, json and process bind is kinda hardwired for now
-     r.upgrade := child
+     r.completed := true
 ```
+
 
 no such file!
 ```
    match
-      r = [#http-request]
-      not(r.finished)
-   bind
-      r.response :=
+      r = [#request-object not(completed) connection]
+   commit
+      connection.response :=
        [status:"404"
         reason:"No such object"
         header: [Spoogle: "nothing"]
         content: ""]
+      r := none
 ```

@@ -111,6 +111,12 @@ static int node_id(lua_State *L)
     return (1);
 }
 
+static int none(lua_State *L)
+{
+    lua_pushlightuserdata(L, enone);
+    return 1;
+}
+
 static int construct_number(lua_State *L)
 {
     interpreter c = lua_context(L);
@@ -362,6 +368,7 @@ interpreter build_lua()
     define(c, "create_edb", lua_create_edb);
     define(c, "insert_edb", lua_insert_edb);
     define(c, "dump_edb", lua_dump_edb);
+    define(c, "snone", enone);
     require_luajit(c, "compiler");
     return c;
 }

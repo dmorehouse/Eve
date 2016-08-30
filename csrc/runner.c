@@ -345,9 +345,8 @@ static boolean fixedpoint(evaluation ev)
     //     }
     // }
 
-    // vector_foreach(ev->blocks, bk) {
-    //     prf("%b\n", print_dot(ev->working, bk, ev->counters));
-    // }
+    // vector_foreach(ev->blocks, bk)
+    //  prf("%b\n", print_dot(ev->working, bk, ev->counters));
 
     // prf("Max node");
     // prf(" - node: %p, kind: %v, id: %v, time: %t, count: %d\n", max_node, max_node->type, max_node->id, max_p->time, max_p->count);

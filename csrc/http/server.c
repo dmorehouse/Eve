@@ -74,6 +74,9 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
     apply(event->insert, x, sym(tag), sym(http-request), 1, 0);
     apply(event->insert, x, sym(request), i, 1, 0);
     apply(event->insert, x, sym(connection), s->self, 1, 0);
+
+    prf("%b\n", edb_dump(init, b));
+
     inject_event(s->parent->ev,event);
     s->e->r = reg;
 }
