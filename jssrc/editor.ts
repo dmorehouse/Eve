@@ -1,5 +1,5 @@
 import {Parser} from "commonmark";
-import * as CodeMirror from "CodeMirror";
+import {CodeMirror} from "CodeMirror";
 import {sendSwap, sendSave, sendParse} from "./client";
 import {setActiveIds, renderer, renderEditor} from "./renderer";
 
