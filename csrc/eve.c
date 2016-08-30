@@ -76,7 +76,7 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
 
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
             heap jh = allocate_rolling(init, sstring("json session"));
-            evaluation ev; // wire in from child
+            evaluation ev = process_resolve(pb, child);
             // allocate json parser
             endpoint e = http_ws_upgrade(*h, e, b, e);
             // not using the write path here

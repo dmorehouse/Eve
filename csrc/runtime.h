@@ -185,7 +185,6 @@ static evaluation build_process(heap h,
     buffer desc;
     bag compiler_bag;
     vector n = compile_eve(h, source, tracing, &compiler_bag);
-    prf("compiled %d\n", vector_length(n));
     uuid compiler_uuid = generate_uuid();
 
     // fixme refactor
@@ -199,3 +198,4 @@ process_bag process_bag_init();
 
 typedef closure(object_handler, bag, uuid);
 object_handler create_json_session(heap h, evaluation ev, uuid u);
+evaluation process_resolve(process_bag, uuid);

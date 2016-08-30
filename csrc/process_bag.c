@@ -14,7 +14,15 @@ struct process_bag{
     table processes;
 };
 
-
+evaluation process_resolve(process_bag pb, uuid e)
+{
+    process p;
+    if ((p = table_find(pb->processes, e))) {
+        return p->ev;
+    }
+    return 0;
+}
+    
 static CONTINUATION_1_5(process_bag_insert, process_bag, value, value, value, multiplicity, uuid);
 static void process_bag_insert(process_bag f, value e, value a, value v, multiplicity m, uuid bku)
 {
