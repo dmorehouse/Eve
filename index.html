@@ -122,17 +122,17 @@
     <script>
       SystemJS.config({
         baseURL: "/build",
-        defaultJSExtensions: true,
+        defaultJSExtensions: true
       });
       // Kicks off requiring everyone else
-      SystemJS.register("CodeMirror", [], function($export) {
-        $export(CodeMirror);
+        SystemJS.register("CodeMirror", [], function($export) {
+        $export("default", CodeMirrror);
+        $export("CodeMirror", CodeMirror);
       });
       SystemJS.register("microReact", [], function($export) {
         $export("Renderer", Renderer);
       });
       SystemJS.register("commonmark", [], function($export) {
-        console.log(commonmark)
         $export(commonmark);
       });
       SystemJS.import("client");
