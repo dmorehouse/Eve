@@ -120,13 +120,13 @@ static void json_input(json_session s, bag json_bag, uuid root_id)
     if(type == sym(event)) {
         bag event = (bag)create_edb(s->h, 0);
         value eavs_id = lookupv(b, root_id, sym(insert));
-        int ix = 0; // @NOTE: If JSON switches to 1 indexed, this is gonna be sad
+        int ix = 1;
         while(true) {
             value eav_id = lookupv(b, eavs_id, box_float(ix));
             if(!eav_id) break;
-            value e = lookupv(b, eav_id, box_float(0));
-            value a = lookupv(b, eav_id, box_float(1));
-            value v = lookupv(b, eav_id, box_float(2));
+            value e = lookupv(b, eav_id, box_float(1));
+            value a = lookupv(b, eav_id, box_float(2));
+            value v = lookupv(b, eav_id, box_float(3));
             apply(event->insert, e, a, v, 1, 0); // @NOTE: It'd be cute to be able to tag this as coming from the json session.
         }
 

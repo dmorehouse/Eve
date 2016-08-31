@@ -323,7 +323,7 @@ static void *start_array(json_parser p)
 {
     push(p->ids, generate_uuid());
     apply(p->b->insert, peek(p->ids), sym(tag), sym(array), 1, 0);
-    push(p->indices, (void *)0);
+    push(p->indices, (void *)1);
     return first_array_element;
 }
 
