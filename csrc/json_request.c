@@ -112,24 +112,69 @@ static void send_response(json_session session, multibag t_solution, multibag f_
     session->current_delta = results;
 }
 
+u64 id_bracket_open = 0xe2a691;
+u64 id_bracket_close = 0xe2a692;
+boolean is_stringy_uuid(value v) {
+    if(type_of(v) != estring_space) return false;
+    estring s = (estring)v;
+    if(s->length < 6) return false; // It's too short to contain id brackets at all.
+    u64 open_rune = 0;
+    memcpy(&open_rune, s->body, 3);
+    if(memcmp(&open_rune, &id_bracket_open, 3) != 0) return false;
+    u64 close_rune = 0;
+    memcpy(&close_rune, s->body + s->length - 4, 3);
+    if(memcmp(&close_rune, &id_bracket_close, 3) != 0) return false;
+    if(close_rune != id_bracket_close) return false;
+    return true;
+}
+
+value map_if_uuid(heap h, value v, bag browser, table mapping) {
+    if(!is_stringy_uuid(v)) return v;
+    value mapped = table_find(mapping, v);
+    if(mapped) return mapped; // If we've already been mapped, reuse that value.
+
+    // Check to see if we map to an existing uuid
+    estring s = (estring)v;
+    buffer str = alloca_wrap_buffer(s->body, s->length);
+    table_foreach(((edb)browser)->eav, e, avl) {
+        buffer eid = allocate_buffer(h, 40);
+        bprintf(eid , "⦑%X⦒", alloca_wrap_buffer(e, UUID_LENGTH));
+        if(string_equal(eid, str)) {
+            table_set(mapping, v, e);
+            return e;
+        }
+    }
+
+    // If we don't map at all, map us to a new uuid.
+    uuid id = generate_uuid();
+    table_set(mapping, v, id);
+    return id;
+}
+
 static CONTINUATION_1_2(json_input, json_session, bag, uuid);
 static void json_input(json_session s, bag json_bag, uuid root_id)
 {
+    if(false) return; // @FIXME: session evaluation is nil, so we segfault.
+
     edb b = (edb)json_bag;
     value type = lookupv(b, root_id, sym(type));
     if(type == sym(event)) {
+        table mapping = create_value_table(s->h);
         bag event = (bag)create_edb(s->h, 0);
+        bag browser = table_find(s->ev->scopes, sym(browser));
         value eavs_id = lookupv(b, root_id, sym(insert));
         int ix = 1;
         while(true) {
             value eav_id = lookupv(b, eavs_id, box_float(ix));
             if(!eav_id) break;
-            value e = lookupv(b, eav_id, box_float(1));
-            value a = lookupv(b, eav_id, box_float(2));
-            value v = lookupv(b, eav_id, box_float(3));
-            apply(event->insert, e, a, v, 1, 0); // @NOTE: It'd be cute to be able to tag this as coming from the json session.
-        }
+            value e = map_if_uuid(s->h, lookupv(b, eav_id, box_float(1)), browser, mapping);
+            value a = map_if_uuid(s->h, lookupv(b, eav_id, box_float(2)), browser, mapping);
+            value v = map_if_uuid(s->h, lookupv(b, eav_id, box_float(3)), browser, mapping);
 
+            apply(event->insert, e, a, v, 1, 0); // @NOTE: It'd be cute to be able to tag this as coming from the json session.
+            ix++;
+        }
+        prf("JSON EVENT\n%b\n", edb_dump(s->h, (edb)event));
         inject_event(s->ev, event);
     }
 }
