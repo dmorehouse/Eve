@@ -115,6 +115,7 @@
     </style>
   </head>
   <body>
+    <script type="text/javascript" src="/jssrc/uuid.js"></script>
     <script type="text/javascript" src="/jssrc/codemirror.js"></script>
     <script type="text/javascript" src="/jssrc/commonmark.js"></script>
     <script type="text/javascript" src="/jssrc/microReact.js"></script>
@@ -125,7 +126,11 @@
         defaultJSExtensions: true
       });
       // Kicks off requiring everyone else
-        SystemJS.register("CodeMirror", [], function($export) {
+      SystemJS.register("uuid", [], function($export) {
+        $export("default", uuid);
+        $export("v4", uuid);
+      });
+      SystemJS.register("CodeMirror", [], function($export) {
         $export("default", CodeMirror);
         $export("CodeMirror", CodeMirror);
       });
