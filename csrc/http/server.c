@@ -9,7 +9,12 @@ struct http_server {
 };
 
 typedef struct session {
-    bag b;
+    // the evaluator is throwing away our headers,
+    // so we stash them here and cant execute piplined or
+    // out of order
+    bag last_headers;
+    bag last_headers_root;
+
     heap h;
     uuid self;
     http_server parent;
@@ -68,25 +73,29 @@ static void dispatch_request(session s, bag b, uuid i, register_read reg)
     bag event = (bag)create_edb(s->h, build_vector(s->h, b));
     uuid x = generate_uuid();
 
-    // sadness
+    // multi- sadness
+    s->last_headers = b;
+    s->last_headers_root = i;
     table_set(s->parent->sessions, x, s);
 
     apply(event->insert, x, sym(tag), sym(http-request), 1, 0);
     apply(event->insert, x, sym(request), i, 1, 0);
     apply(event->insert, x, sym(connection), s->self, 1, 0);
 
-    prf("%b\n", edb_dump(init, b));
-
     inject_event(s->parent->ev,event);
     s->e->r = reg;
 }
 
 
-endpoint http_ws_upgrade(http_server s, endpoint e, bag b, uuid root)
+endpoint http_ws_upgrade(http_server s, bag b, uuid root)
 {
     session hs = table_find(s->sessions, root);
-
-    return websocket_send_upgrade(hs->h, hs->e, b, root);
+    if (hs)
+        return websocket_send_upgrade(hs->h, hs->e,
+                                      hs->last_headers,
+                                      hs->last_headers_root);
+    prf("no http connection correlator found for %v\n");
+    return 0;
 }
 
 CONTINUATION_1_2(new_connection, http_server, endpoint, station);

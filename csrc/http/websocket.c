@@ -24,6 +24,11 @@ typedef enum {
     ws_pong = 10,
 } opcodes;
 
+static CONTINUATION_1_1(websocket_reg, websocket, reader);
+static void websocket_reg(websocket w, reader r)
+{
+    w->client = r;
+}
 
 // implement close
 void websocket_send(websocket w, int opcode, buffer b, thunk t)
@@ -209,14 +214,12 @@ endpoint websocket_send_upgrade(heap h,
                                 uuid n)
 {
     websocket w = new_websocket(h);
-    estring ekey;
+    uuid headers = lookupv((edb)b, n, sym(headers));
+    estring ekey =lookupv((edb)b, headers, sym(Sec-WebSocket-Key));
+    estring proto =lookupv((edb)b, headers, sym(Sec-WebSocket-Protocol));
     string key;
 
-    if (!(ekey=lookupv((edb)b, n, sym(Sec-WebSocket-Key)))) {
-        // something tasier
-        return 0;
-    }
-
+    if (!ekey) return 0;
     key = allocate_buffer(h, ekey->length);
     buffer_append(key, ekey->body, ekey->length);
     string_concat(key, sstring("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
@@ -229,6 +232,8 @@ endpoint websocket_send_upgrade(heap h,
     outline(upgrade, "Upgrade: websocket");
     outline(upgrade, "Connection: Upgrade");
     outline(upgrade, "Sec-WebSocket-Accept: %b", r);
+    if (proto)
+        outline(upgrade, "Sec-WebSocket-Protocol: %r", proto);
     outline(upgrade, "");
 
     register_periodic_timer(seconds(5), cont(w->h, send_keepalive, w, allocate_buffer(w->h, 0)));
@@ -236,5 +241,6 @@ endpoint websocket_send_upgrade(heap h,
     apply(w->down->w, upgrade, ignore);
     apply(w->down->r, w->self);
     w->up.w = cont(h, websocket_output_frame, w);
+    w->up.r = cont(h, websocket_reg, w);
     return &w->up;
 }

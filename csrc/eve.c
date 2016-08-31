@@ -65,8 +65,8 @@ static CONTINUATION_4_2(http_eval_result, http_server *, table, process_bag, uui
 static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid where, multibag t, multibag f)
 {
     bag b;
-    prf ("http eval result: %v\n", where);
-    if (!f || (!(b=table_find(f, where)))) {
+
+    if (!t || (!(b=table_find(t, where)))) {
         prf("empty http eval result %d\n", f?table_elements(f):0);
     } else {
         edb_foreach_ev((edb)b, e, sym(response), response, m){
@@ -76,14 +76,15 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
         }
 
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
-            prf("upgrade\n");
+            prf("upgrade %v\n", e);
+
             heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev = process_resolve(pb, child);
             // allocate json parser
-            endpoint e = http_ws_upgrade(*h, e, b, e);
+            endpoint end = http_ws_upgrade(*h, b, e);
             // not using the write path here
             // browser sessinon
-            parse_json(jh, e, create_json_session(jh, ev, 0));
+            parse_json(jh, end, create_json_session(jh, ev, 0));
         }
     }
 }

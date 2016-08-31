@@ -247,6 +247,7 @@ static CONTINUATION_6_4(do_erase, perf, execf, block,
 static void do_erase(perf p, execf n, block bk, vector scopes, value mt, value e,
                    heap h, perf pp, operator op, value *r)
 {
+    start_perf(p, op);
     if (op == op_insert) {
         bag b;
         multibag *target;
@@ -259,7 +260,8 @@ static void do_erase(perf p, execf n, block bk, vector scopes, value mt, value e
 
         vector_foreach(scopes, u) {
             // xxx - this can be done in constant time rather than
-            // the size of the object
+            // the size of the object. the attribute tables are also
+            // being left behind below, which will confuse generic join
             if ((b = table_find(bk->ev->t_input, u))) {
                 apply(b->scan, s_Eav,
                       cont(h, each_t_remove, bk->ev, bk->ev->working, u, target),
@@ -272,6 +274,8 @@ static void do_erase(perf p, execf n, block bk, vector scopes, value mt, value e
             }
         }
     }
+    apply(n, h, p, op, r);
+    stop_perf(p, pp);
 }
 
 static execf build_erase(block bk, node n)

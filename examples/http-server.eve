@@ -7,10 +7,6 @@ start path resolution
   bind
      [#path index:1 file:fr]
      [#path index token]
-     [#content-type suffix:"jpeg" type:"application/jpeg"]
-     [#content-type suffix:"css" type:"text/css"]
-     [#content-type suffix:"js" type:"application/javascript"]
-     [#content-type suffix:"html" type:"text/html"]
 ```
 
 resolve a path
@@ -31,10 +27,25 @@ match
      final = [#path index: count[given: index] file]
      split[text:final.token by:"." token:extoken index:exindex]
      exindex = 2
+     // since this object is part of the event context, its
+     // not avilable when we're looking for it in send eve bootsrap
+     ws = if connection.request.headers.Sec-WebSocket-Protocol = "eve-json" then true else false
+
 commit
-     [#request-object extension: extoken connection token: final.token file]
+     [#request-object extension: extoken connection websocket:ws token: final.token file]
 ```
 
+
+assert the content type table in the same t as the content response
+```
+match
+     [#request-object]
+bind
+     [#content-type suffix:"jpeg" type:"application/jpeg"]
+     [#content-type suffix:"css" type:"text/css"]
+     [#content-type suffix:"js" type:"application/javascript"]
+     [#content-type suffix:"html" type:"text/html"]
+```
 
 complete! send content response
 ```
@@ -52,11 +63,10 @@ complete! send content response
 ```
 
 
-initiate eve program
+send eve bootstrap
 ```
   match
-     r = [#request-object connection connection:[request:[headers: [not(Sec-WebSocket-Protocol)]]]
-                          extension:"eve" file]
+     r = [#request-object connection websocket:false extension:"eve" file]
      [#root child:[name:"index.html" contents]]
   commit
      connection.response := [
@@ -72,16 +82,14 @@ initiate eve program
 start eve program
 ```
   match
-     r = [#request-object request:[headers: [Sec-WebSocket-Protocol]]]
-     [#request-object extension:"eve" file]
+     r = [#request-object connection websocket:true extension:"eve" file]
   commit @process
      // build an environment for the new process
      child = [#process source: file.contents]
   commit
      connection.upgrade := child
      r := none
-  bind
-     r.completed := true
+  bind r.completed := true
 ```
 
 

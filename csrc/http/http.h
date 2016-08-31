@@ -48,4 +48,4 @@ void http_send_header(buffer_handler w, bag b, uuid n, value first, value second
 endpoint websocket_client(heap h, bag request, uuid rid);
 
 buffer json_encode(heap, bag b, uuid n);
-endpoint http_ws_upgrade(http_server s, endpoint e, bag b, uuid root);
+endpoint http_ws_upgrade(http_server s, bag b, uuid root);
