@@ -53,10 +53,10 @@ void process_bag_commit(process_bag pb, edb s)
         process p;
         estring source = v;
         if ((p = table_find(pb->processes, e))){
-            evaluation ev = build_process(p->h,
-                                          wrap_buffer(p->h, source->body, source->length),
-                                          false, p->scopes, p->persisted,
-                                          ignore, ignore);
+            p->ev = build_process(p->h,
+                                  wrap_buffer(p->h, source->body, source->length),
+                                  false, p->scopes, p->persisted,
+                                  ignore, ignore);
         }
     }
 }

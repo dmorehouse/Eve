@@ -76,15 +76,12 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
         }
 
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
-            prf("upgrade %v\n", e);
-
             heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev = process_resolve(pb, child);
-            // allocate json parser
-            endpoint end = http_ws_upgrade(*h, b, e);
-            // not using the write path here
-            // browser sessinon
-            parse_json(jh, end, create_json_session(jh, ev, 0));
+            if (ev) 
+                parse_json(jh,
+                           http_ws_upgrade(*h, b, e),
+                           create_json_session(jh, ev, 0));
         }
     }
 }
@@ -124,7 +121,6 @@ static void run_eve_http_server(char *x)
     build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
     process_bag pb  = process_bag_init();
     build_bag(scopes, persisted, "process", (bag)pb);
-
     bag content = (bag)create_edb(init, 0);
 
     // right now, the response is being persisted..to the event bag?
