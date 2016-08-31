@@ -154,7 +154,10 @@ value map_if_uuid(heap h, value v, bag browser, table mapping) {
 static CONTINUATION_1_2(json_input, json_session, bag, uuid);
 static void json_input(json_session s, bag json_bag, uuid root_id)
 {
-    if(false) return; // @FIXME: session evaluation is nil, so we segfault.
+    if(!json_bag) {
+        // should we kill the evaluation? most likely
+        return;
+    }
 
     edb b = (edb)json_bag;
     value type = lookupv(b, root_id, sym(type));

@@ -88,7 +88,7 @@ index.o: ../index.html
 	cc wrap.S -DSTART=$(S)$*_css_start -DEND=$(S)$*_css_end -DFILE='"$<"' -c -o $@
 
 path.c: Makefile
-	echo 'char *pathroot = "$(BUILD)";' > path.c
+	echo 'char *pathroot = "$(BUILD)/../";' > path.c
 
 %.o: %.c continuation_templates.h $(UNIX_H) $(CORE_H) $(RUNTIME_H) $(HTTP_H)
 	cc -std=gnu99 -I../csrc/unix -I../csrc/core -I../csrc -I. $(INCLUDES) -I$(LUAJIT_INCLUDES) $(CFLAGS) -c $<

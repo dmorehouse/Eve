@@ -93,7 +93,7 @@ static void filebag_ea_scan(filebag fb, file f, struct stat *s, listener out, va
     }
     if (a == sym(contents)) {
         buffer x = read_file(fb->h, path_of_file(f));
-        apply(out, e, a, intern_buffer(x), 1, 0);
+        if (x) apply(out, e, a, intern_buffer(x), 1, 0);
         return;
     }
     // also struct tiespec st_mtimespec
@@ -236,7 +236,7 @@ bag filebag_init(buffer root_pathname)
     //    fb->b.u = generate_uuid();
     fb->idmap = create_value_table(h);
     fb->root = allocate_file(fb, 0, generate_uuid());
-    fb->root->name = intern_cstring(".");
+    fb->root->name = intern_buffer(root_pathname);
     fb->b.listeners = allocate_table(h, key_from_pointer, compare_pointer);
     fb->b.commit = cont(h, filebag_commit, fb);
     return (bag)fb;

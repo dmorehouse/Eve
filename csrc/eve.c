@@ -78,10 +78,18 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
         edb_foreach_ev((edb)b, e, sym(upgrade), child, m){
             heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev = process_resolve(pb, child);
-            if (ev) 
+            if (ev) {
                 parse_json(jh,
                            http_ws_upgrade(*h, b, e),
                            create_json_session(jh, ev, 0));
+                bag session_connect = (bag)create_edb(jh, 0);
+
+                apply(session_connect->insert,
+                      generate_uuid(),
+                      sym(tag),
+                      sym(session-connect), 1, 0);
+                inject_event(ev, session_connect);
+            }
         }
     }
 }
@@ -117,7 +125,9 @@ static void run_eve_http_server(char *x)
     // maybe?
     build_bag(scopes, persisted, "event", (bag)create_edb(h, 0));
     build_bag(scopes, persisted, "remove", (bag)create_edb(h, 0));
-    // xxx - these two probably shouldn't be part of the default scope..but hey
+
+    // system facilities are part of the 'boot' program, but aren't
+    // accessible by children without explicit arrangement
     build_bag(scopes, persisted, "file", (bag)filebag_init(sstring(pathroot)));
     process_bag pb  = process_bag_init();
     build_bag(scopes, persisted, "process", (bag)pb);
