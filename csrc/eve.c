@@ -79,9 +79,9 @@ static void http_eval_result(http_server *h, table inputs, process_bag pb, uuid 
             heap jh = allocate_rolling(init, sstring("json session"));
             evaluation ev = process_resolve(pb, child);
             if (ev) {
-                parse_json(jh,
-                           http_ws_upgrade(*h, b, e),
-                           create_json_session(jh, ev, 0));
+                endpoint ws =  http_ws_upgrade(*h, b, e);
+                parse_json(jh, ws, create_json_session(jh, ev, ws,
+                                                       table_find(ev->scopes, "browser")));
                 bag session_connect = (bag)create_edb(jh, 0);
 
                 apply(session_connect->insert,

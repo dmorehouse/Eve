@@ -82,6 +82,8 @@ static void send_diff(heap h, buffer_handler output, values_diff diff)
 static CONTINUATION_1_2(send_response, json_session, multibag, multibag);
 static void send_response(json_session session, multibag t_solution, multibag f_solution)
 {
+    prf ("send response!%b\n", edb_dump(init, f_solution));
+
     heap h = allocate_rolling(pages, sstring("response"));
     heap p = allocate_rolling(pages, sstring("response delta"));
     table results = create_value_vector_table(p);
@@ -182,12 +184,18 @@ static void json_input(json_session s, bag json_bag, uuid root_id)
     }
 }
 
-object_handler create_json_session(heap h, evaluation ev, uuid u)
+object_handler create_json_session(heap h, evaluation ev, endpoint down, uuid u)
 {
     // allocate json parser
     json_session s = allocate(h, sizeof(struct json_session));
     s->h = h;
+    s->down = down;
     s->ev = ev;
+    s->current_delta = create_value_vector_table(allocate_rolling(pages, sstring("json delta")));
+    // xxx - very clumsy way to wire this up
+    ev->complete = cont(h, send_response, s);
+    ev->error = cont(h, handle_error, s);
+
     s->u = u;
     return(cont(h, json_input, s));
 }

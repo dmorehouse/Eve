@@ -22,7 +22,7 @@ evaluation process_resolve(process_bag pb, uuid e)
     }
     return 0;
 }
-    
+
 static CONTINUATION_1_5(process_bag_insert, process_bag, value, value, value, multiplicity, uuid);
 static void process_bag_insert(process_bag f, value e, value a, value v, multiplicity m, uuid bku)
 {
@@ -45,8 +45,14 @@ void process_bag_commit(process_bag pb, edb s)
         table_set(pb->processes, e, p);
     }
 
-    edb_foreach_ev(s, e, sym(scope), v, m) {
-
+    edb_foreach_ev(s, e, sym(scopes), v, m) {
+        process p;
+        if ((p = table_find(pb->processes, e))){
+            value name = lookupv(s, v, sym(name));
+            table_set(p->scopes, name, v);
+            // xxx- sharing - this allocation should come from the bagbag
+            table_set(p->persisted, v, create_edb(p->h, 0));
+        }
     }
 
     edb_foreach_ev(s, e, sym(source), v, m) {
