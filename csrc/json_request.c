@@ -113,9 +113,25 @@ static void send_response(json_session session, multibag t_solution, multibag f_
 }
 
 static CONTINUATION_1_2(json_input, json_session, bag, uuid);
-static void json_input(json_session s, bag b, uuid x)
+static void json_input(json_session s, bag json_bag, uuid root_id)
 {
-    // uhh, guys?
+    edb b = (edb)json_bag;
+    value type = lookupv(b, root_id, sym(type));
+    if(type == sym(event)) {
+        bag event = (bag)create_edb(s->h, 0);
+        value eavs_id = lookupv(b, root_id, sym(insert));
+        int ix = 0; // @NOTE: If JSON switches to 1 indexed, this is gonna be sad
+        while(true) {
+            value eav_id = lookupv(b, eavs_id, box_float(ix));
+            if(!eav_id) break;
+            value e = lookupv(b, eav_id, box_float(0));
+            value a = lookupv(b, eav_id, box_float(1));
+            value v = lookupv(b, eav_id, box_float(2));
+            apply(event->insert, e, a, v, 1, 0); // @NOTE: It'd be cute to be able to tag this as coming from the json session.
+        }
+
+        inject_event(s->ev, event);
+    }
 }
 
 object_handler create_json_session(heap h, evaluation ev, uuid u)
