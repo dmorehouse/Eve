@@ -95,17 +95,12 @@ static void run_eve_http_server(char *x)
     uuid fid = generate_uuid();
     table_set(persisted, fid, fb);
 
-
     table_set(scopes, sym(file), fid);
     table_set(scopes, sym(process), pid);
 
     heap hc = allocate_rolling(pages, sstring("eval"));
-    evaluation ev = build_process(hc, b, enable_tracing,
-                                  scopes,
-                                  persisted,
-                                  ignore,
-                                  cont(h, handle_error_terminal));
-
+    vector n = compile_eve(h, b, false, &compiler_bag);
+    evaluation ev = build_evaluation(h, sym(http-server), scopes, persisted, ignore, cont(h, handle_error_terminal), n);
     create_http_server(create_station(0, port), ev, pb);
     prf("\n----------------------------------------------\n\nEve started. Running at http://localhost:%d\n\n",port);
 }

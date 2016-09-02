@@ -9,6 +9,8 @@ static estring bagname(evaluation e, uuid u)
     return(intern_cstring("missing bag?"));
 }
 
+static uuid bag_bag_id;
+
 // @FIXME: This collapses multibag diffs into a single diff.
 static bag diff_sets(heap h, multibag neue_bags, multibag old_bags)
 {
@@ -302,13 +304,21 @@ static boolean fixedpoint(evaluation ev)
     } while(again);
 
 
-    // what about multibag commits?
-    // new bags really shouldn't be allocated from ev->h
+
+    // xxx - clear out the new bags before anything else
+    if (ev->t_solution) {
+        edb bdelta = table_find(ev->t_solution, bag_bag_id);
+        if (bdelta)
+            apply(ev->bag_bag->commit, bdelta);
+    }
+
     multibag_foreach(ev->t_solution, u, b) {
         bag bd;
-        if (!(bd = table_find(ev->t_input, u)))
-            table_set(ev->t_input, u, bd = (bag)create_edb(ev->h, 0));
-        apply(bd->commit, b);
+        if (u != bag_bag_id) {
+            if (!(bd = table_find(ev->t_input, u)))
+                table_set(ev->t_input, u, bd = (bag)create_edb(ev->h, 0));
+            apply(bd->commit, b);
+        }
     }
 
     multibag_foreach(ev->t_solution, u, b){
@@ -326,7 +336,8 @@ static boolean fixedpoint(evaluation ev)
     // counters? reflection? enable them
     apply(ev->complete, ev->t_solution, ev->last_f_solution);
 
-    prf ("fixedpoint in %t seconds, %d blocks, %V iterations, %d changes to global, %d maintains, %t seconds handler\n",
+    prf ("fixedpoint %v in %t seconds, %d blocks, %V iterations, %d changes to global, %d maintains, %t seconds handler\n",
+         ev->name,
          end_time-start_time, vector_length(ev->blocks),
          counts,
          multibag_count(ev->t_solution),
@@ -390,7 +401,9 @@ void close_evaluation(evaluation ev)
     destroy(ev->h);
 }
 
+
 evaluation build_evaluation(heap h,
+                            estring name,
                             table scopes,
                             multibag t_input,
                             evaluation_result r,
@@ -399,6 +412,7 @@ evaluation build_evaluation(heap h,
 {
     evaluation ev = allocate(h, sizeof(struct evaluation));
     ev->h = h;
+    ev->name = name;
     ev->error = error;
     // consider adding "event" to the running namespace
     ev->scopes = scopes;
@@ -409,13 +423,19 @@ evaluation build_evaluation(heap h,
     ev->complete = r;
     ev->terminal = cont(ev->h, evaluation_complete, ev);
     ev->run = cont(h, run_solver, ev);
-
     ev->default_scan_scopes = allocate_vector(h, 5);
     ev->default_insert_scopes = allocate_vector(h, 5);
     table_foreach(ev->t_input, uuid, z) {
         bag b = z;
         table_set(b->listeners, ev->run, (void *)1);
     }
+
+    ev->bag_bag = init_bag_bag(ev);
+
+    if (!bag_bag_id)
+        bag_bag_id = generate_uuid();
+
+    table_set(ev->scopes, sym(bag), bag_bag_id);
 
     // xxx - compiler output reflecton
     vector_foreach(implications, i) {

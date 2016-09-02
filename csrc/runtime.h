@@ -97,6 +97,7 @@ typedef closure(bag_handler, bag);
 
 struct evaluation  {
     heap h;
+    estring name;
     heap working; // lifetime is a whole f-t pass
     error_handler error;
 
@@ -140,7 +141,8 @@ extern char *pathroot;
 
 vector compile_eve(heap h, buffer b, boolean tracing, bag *compiler_bag);
 
-evaluation build_evaluation(heap h, table scopes, table persisted,
+evaluation build_evaluation(heap h, estring name,
+                            table scopes, table persisted,
                             evaluation_result e, error_handler error,
                             vector implications);
 
@@ -169,22 +171,6 @@ void multibag_insert(multibag *mb, heap h, uuid u, value e, value a, value v, mu
 
 
 bag init_bag_bag(evaluation ev);
-
-static evaluation build_process(heap h,
-                                buffer source,
-                                boolean tracing,
-                                table scopes,
-                                table inputs,
-                                evaluation_result r,
-                                error_handler e)
-{
-    buffer desc;
-    bag compiler_bag;
-    vector n = compile_eve(h, source, tracing, &compiler_bag);
-    evaluation ev = build_evaluation(h, scopes, inputs, r, e, n);
-    ev->bag_bag = init_bag_bag(ev);
-    return ev;
-}
 
 typedef struct process_bag *process_bag;
 process_bag process_bag_init();
