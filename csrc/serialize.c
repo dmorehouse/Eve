@@ -1,3 +1,5 @@
+#include <runtime.h>
+
 // the serialization typespace
 #define uuid_bits 0x80
 #define uuid_mask 0x7f
@@ -20,12 +22,16 @@
  00000001 true
  00000000 false
 */
-o
+
+/*
+ * note on denormal numbers - highest 11 bits are zero
+ */
+
 #define version_zero 0x08
 #define triple_marker 0x03
 #define float64_prelude 0x02
-#define true 0x01
-#define false 0x0
+#define true_constant 0x01
+#define false_constant 0x0
 
 void serialize_value(buffer dest, value v)
 {
