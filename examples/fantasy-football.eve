@@ -1,4 +1,5 @@
-Working through the Fantasy Football online assignment - [Fantasy Football Assignment](http://www.yummymath.com/wp-content/uploads/Fantasy_Football_2014.pdf)
+
+rking through the Fantasy Football online assignment - [Fantasy Football Assignment](http://www.yummymath.com/wp-content/uploads/Fantasy_Football_2014.pdf)
 
 ## Scoring
 ### QB Scoring
@@ -33,7 +34,7 @@ In week one of the 2011 – 2012 season Tom Brady threw four touchdowns, 510 pas
  match
    [#session-connect]
   commit
-    [@Tom-Brady #qb td: 4 passing-yards: 510 interception: 1]  
+    [@Tom-Brady #player #qb td: 4 passing-yards: 510 interception: 1]  
 ```
 
 ## Q2
@@ -42,7 +43,7 @@ In week six of the 2013 season Nick Foles, threw seven touchdown, had 406 passin
  match
    [#session-connect]
   commit
-    [@Nick-Foles #qb td: 7 passing-yards: 406 interception: 0]
+    [@Nick-Foles #player #qb td: 7 passing-yards: 406 interception: 0]
 ```
 
 ## Q3
@@ -58,18 +59,22 @@ Surely there's a better way than this!!!
     [#session-connect]
     possibleTDs = range[from:0 to: 10]
   commit
-    [#qb #qb4 passing-yards: 180 interception: 3 td: possibleTDs]
-    [#qb @temp-QB passing-yards: 180 interception: 3 td: 2]
+    [#qb #player #q4 passing-yards: 180 interception: 3 td: possibleTDs]
 ```
 
 ```
   match
-    qb = [#qb4 score: 15]
+    qb = [#q4 score: 15]
   commit
-    qb.name := "Q4-Answer"
+    qb.name := "Q4-Answer-TDs-{{qb.td}}"
 ```
 
-
+```
+ match
+   qb = [#qb5]
+  bind
+   [#div text: "QB4 - Pass: {{qb.passing-yards}} - TDs: {{qb.td}} - Score: {{qb.score}}"]
+```
 
 Calculate and display QB scores
 ```
@@ -79,7 +84,15 @@ Calculate and display QB scores
     score = qb.td * scoring.td + qb.passing-yards * scoring.pass + qb.interception * scoring.interception
 
  bind
-    [#div text: "{{qb.name}} (QB) - Score: {{score}}"]
     qb.score := score
+    qb.position := "QB"
 ```
 
+Display players with scores
+```
+ match
+  [#player name score position]
+  bind
+   [#div text: "{{name}} ({{position}}) - Score: {{score}}"]
+```
+  
