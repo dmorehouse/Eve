@@ -1,0 +1,83 @@
+## Scoring
+### QB Scoring
+Touchdown (Pass or Run) = 6 points 
+Passing Yard = 0.05 points 
+Interception = -2 points
+
+### Receiver Scoring
+Touchdown = 6 points 
+Receptions = 0.2 points 
+Receiving Yards = 0.1 point 
+Fumble = -2 points
+
+### Running Back Scoring
+Touchdown = 6 points 
+Receptions = 0.2 points 
+Receiving Yards = 0.1 point 
+Rushing Yard = 0.1 point 
+Fumble = -2 points
+```
+  match 
+    [#session-connect]
+  commit
+    [@qb-scoring td: 6 pass: 0.05 interception: -2]
+    [@receiver-scoring td: 6 catch: 0.2 yards: 0.1 fumble: -2]
+    [@rb-scoring td: 6 reception: 0.2 yards: 0.1 fumble: -2]
+```
+
+## Q1 
+In week one of the 2011 – 2012 season Tom Brady threw four touchdowns, 510 passing yards and one interception. Find the number of fantasy points Tom Brady has scored in this week. Show your work or reasoning below:
+```
+ match
+   [#session-connect]
+  commit
+    [@Tom-Brady #qb td: 4 passing-yards: 510 interception: 1]  
+```
+
+## Q2
+In week six of the 2013 season Nick Foles, threw seven touchdown, had 406 passing yards and zero interceptions. Find the number of fantasy points Nick Foles scored in this week. Show your work or reasoning below:
+```
+ match
+   [#session-connect]
+  commit
+    [@Nick-Foles #qb td: 7 passing-yards: 406 interception: 0]
+```
+
+## Q3
+Look back at your method for the previous two problems. Write a formula that gives the points (p) for any number of touchdowns (t), passing yards (y), and interceptions (n).
+p = t * 6 + y * 0.05 + n * -2
+
+## Q4
+A quarterback threw for 180 yards, three interceptions and had 15 total points. Use your rule to find the number of touchdown passes this quarterback threw for.
+
+Surely there's a better way than this!!!
+```
+  match
+    [#session-connect]
+    possibleTDs = range[from:0 to: 10]
+  commit
+    [#qb #qb4 passing-yards: 180 interception: 3 td: possibleTDs]
+    [#qb @temp-QB passing-yards: 180 interception: 3 td: 2]
+```
+
+```
+  match
+    qb = [#qb4 score: 15]
+  commit
+    qb.name := "Q4-Answer"
+```
+
+
+
+Calculate and display QB scores
+```
+ match
+    qb = [#qb]
+    scoring = [@qb-scoring]
+    score = qb.td * scoring.td + qb.passing-yards * scoring.pass + qb.interception * scoring.interception
+
+ bind
+    [#div text: "{{qb.name}} (QB) - Score: {{score}}"]
+    qb.score := score
+```
+
