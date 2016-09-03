@@ -66,7 +66,6 @@ uuid parse_uuid(string c)
     return (intern_uuid(u));
 }
 
-
 uuid generate_uuid()
 {
     static int count = 0;

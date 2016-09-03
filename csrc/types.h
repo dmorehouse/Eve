@@ -11,6 +11,8 @@
 
 #define efalse ((void *)(register_space + 0x100000000))
 #define etrue ((void *)(register_space + 0x100000001))
+// xxx - are none (use for deletion by insertion) and ignore (used to bound scans)
+// the same?
 #define enone ((void *)(register_space + 0x10000003))
 #define register_ignore ((void *)(register_space + 0x100000002))
 
